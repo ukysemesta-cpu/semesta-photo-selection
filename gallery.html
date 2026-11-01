@@ -32,8 +32,8 @@
   <div class="modal" id="previewModal" aria-hidden="true"><button class="modal-close" id="closePreview">×</button><button class="modal-arrow prev" id="prevPhoto">‹</button><div class="preview-content"><img class="preview-art" id="previewArt" alt="Preview foto" style="object-fit:contain;max-width:100%;max-height:70vh;"><div class="preview-caption"><span id="previewName">Foto</span><button class="btn btn-primary" id="previewSelect">♡ Pilih Foto</button></div></div><button class="modal-arrow next" id="nextPhoto">›</button></div>
   <script>
     const q = new URLSearchParams(location.search);
-    const token = q.get("token");
-    if (token) document.getElementById("progressLink").href = `progress.html?token=${encodeURIComponent(token)}`;
+const pageToken = q.get("token");
+if (pageToken) document.getElementById("progressLink").href = `progress.html?token=${encodeURIComponent(pageToken)}`;
     const helpBtn = document.getElementById("helpMenuButton");
     const helpDropdown = document.getElementById("helpDropdown");
     helpBtn.addEventListener("click", () => helpDropdown.classList.toggle("show"));
