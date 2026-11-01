@@ -127,30 +127,170 @@ async function setEditingStatus(g,status){
   await sb.from("editing_progress").insert({gallery_id:g.id,status,created_by:currentUser.id});
   g.editingStatus=status;alert(`Status ${g.clientName} diperbarui menjadi ${status}.`);
 }
-async function managePhotos(g){
-  const {data,error}=await sb.from("photos").select("id,filename,preview_url,download_url,sort_order").eq("gallery_id",g.id).order("sort_order");
-  if(error){alert("Gagal membaca foto: "+error.message);return;}
-  const current=(data||[]).map(p=>`${p.filename}|${p.preview_url||""}|${p.download_url||""}`).join("\n");
-  const instruction=`Galeri: ${g.galleryName}\nMasukkan satu foto per baris dengan format:\nNAMA_FILE|URL_PREVIEW|URL_DOWNLOAD\n\nContoh:\nDSCF1200.JPG|https://...jpg|https://...jpg\n\nKosongkan untuk membatalkan. Baris yang disimpan akan menggantikan daftar foto galeri ini. Gunakan URL gambar langsung yang bisa diakses browser.\n\nDaftar saat ini:\n${current}`;
-  const input=prompt(instruction,current);
-  if(input===null)return;
-  const lines=input.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  const rows=[];
-  for(const [i,line] of lines.entries()){
-    const parts=line.split("|").map(x=>x.trim());
-    if(parts.length<2||!parts[0]||!/^https?:\/\//i.test(parts[1])){
-      alert(`Format baris ${i+1} tidak valid. Gunakan NAMA_FILE|URL_PREVIEW|URL_DOWNLOAD dan URL preview harus berupa http/https.`);return;
-    }
-    rows.push({gallery_id:g.id,filename:parts[0],preview_url:parts[1],download_url:parts[2]&&/^https?:\/\//i.test(parts[2])?parts[2]:parts[1],sort_order:i});
-  }
-  const del=await sb.from("photos").delete().eq("gallery_id",g.id);
-  if(del.error){alert("Gagal mengganti daftar foto: "+del.error.message);return;}
-  if(rows.length){
-    const ins=await sb.from("photos").insert(rows);
-    if(ins.error){alert("Foto gagal disimpan: "+ins.error.message);return;}
-  }
-  alert(`${rows.length} foto tersimpan untuk galeri ${g.galleryName}.`);
+const PHOTO_BUCKET = "photo-previews";
+const MAX_SOURCE_FILE_BYTES = 15 * 1024 * 1024;
+const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
+let activePhotoGallery = null;
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
+
+async function makeWebpPreview(file) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    throw new Error(`${file.name}: format tidak didukung. Gunakan JPG, PNG, atau WebP.`);
+  }
+  if (file.size > MAX_SOURCE_FILE_BYTES) {
+    throw new Error(`${file.name}: ukuran file sumber melebihi 15 MB.`);
+  }
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const maxSide = 1920;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("Browser tidak dapat memproses gambar.");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    for (const quality of [0.82, 0.72, 0.62, 0.52]) {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/webp", quality));
+      if (!blob) throw new Error(`Gagal mengubah ${file.name} menjadi WebP.`);
+      if (blob.size <= MAX_PREVIEW_BYTES) return blob;
+    }
+    throw new Error(`${file.name}: hasil preview masih lebih dari 2 MB. Coba gunakan file sumber yang lebih kecil.`);
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+async function loadManagedPhotos(g) {
+  const list = $("managedPhotoList");
+  list.innerHTML = '<div class="details-empty">Memuat daftar foto...</div>';
+  const { data, error } = await sb.from("photos")
+    .select("id,filename,preview_url,sort_order,created_at")
+    .eq("gallery_id", g.id)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    list.innerHTML = `<div class="details-empty">Gagal membaca foto: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+  if (!data?.length) {
+    list.innerHTML = '<div class="details-empty">Belum ada foto di galeri ini. Pilih foto dari laptop untuk mulai mengunggah.</div>';
+    return;
+  }
+  list.innerHTML = data.map((p, i) => `
+    <div class="photo-item">
+      <div><b>${i + 1}. ${escapeHtml(p.filename)}</b><small>${escapeHtml(p.preview_url || "Preview belum memiliki lokasi penyimpanan")}</small></div>
+      <span class="pill pill-green">Tersimpan</span>
+    </div>`).join("");
+}
+
+async function managePhotos(g) {
+  activePhotoGallery = g;
+  $("photoManagerTitle").textContent = `Kelola Foto — ${g.galleryName}`;
+  $("photoManagerDescription").textContent = `Klien: ${g.clientName}. Foto yang diunggah akan menjadi preview galeri, bukan file asli untuk diunduh.`;
+  $("photoFilesInput").value = "";
+  $("photoUploadStatus").textContent = "Belum ada file dipilih.";
+  $("uploadPhotosButton").disabled = false;
+  $("photoManagerModal").classList.add("open");
+  $("photoManagerModal").setAttribute("aria-hidden", "false");
+  await loadManagedPhotos(g);
+}
+
+async function uploadPhotosToGallery() {
+  const g = activePhotoGallery;
+  const input = $("photoFilesInput");
+  const files = Array.from(input.files || []);
+  if (!g) return;
+  if (!files.length) {
+    alert("Pilih minimal satu foto terlebih dahulu.");
+    return;
+  }
+  if (files.length > 50) {
+    alert("Maksimal 50 foto dalam satu proses upload.");
+    return;
+  }
+
+  const button = $("uploadPhotosButton");
+  const status = $("photoUploadStatus");
+  button.disabled = true;
+  input.disabled = true;
+  let success = 0;
+  const errors = [];
+
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      status.textContent = `Memproses ${i + 1}/${files.length}: ${file.name}`;
+      let objectPath = null;
+      try {
+        const previewBlob = await makeWebpPreview(file);
+        objectPath = `${g.id}/${crypto.randomUUID()}.webp`;
+        const { error: uploadError } = await sb.storage.from(PHOTO_BUCKET).upload(objectPath, previewBlob, {
+          contentType: "image/webp",
+          cacheControl: "3600",
+          upsert: false
+        });
+        if (uploadError) throw uploadError;
+
+        const { error: insertError } = await sb.from("photos").insert({
+          gallery_id: g.id,
+          filename: file.name,
+          mime_type: "image/webp",
+          preview_url: objectPath,
+          download_url: null,
+          sort_order: Date.now() + i,
+          is_active: true
+        });
+        if (insertError) {
+          await sb.storage.from(PHOTO_BUCKET).remove([objectPath]);
+          throw insertError;
+        }
+        success++;
+      } catch (err) {
+        errors.push(`${file.name}: ${err.message || "Gagal diunggah"}`);
+      }
+    }
+
+    await loadManagedPhotos(g);
+    status.textContent = `${success} dari ${files.length} foto berhasil diunggah.`;
+    input.value = "";
+    if (errors.length) {
+      alert(`Upload selesai dengan beberapa kendala.\nBerhasil: ${success}\nGagal:\n${errors.join("\n")}`);
+    } else {
+      alert(`${success} preview foto berhasil diunggah ke Supabase Storage.`);
+    }
+  } finally {
+    button.disabled = false;
+    input.disabled = false;
+  }
+}
+
+$("closePhotoManager").addEventListener("click", () => {
+  $("photoManagerModal").classList.remove("open");
+  $("photoManagerModal").setAttribute("aria-hidden", "true");
+  activePhotoGallery = null;
+});
+$("photoManagerModal").addEventListener("click", e => {
+  if (e.target === $("photoManagerModal")) $("closePhotoManager").click();
+});
+$("photoFilesInput").addEventListener("change", e => {
+  const files = Array.from(e.target.files || []);
+  $("photoUploadStatus").textContent = files.length
+    ? `${files.length} file dipilih · ${formatBytes(files.reduce((sum, f) => sum + f.size, 0))}`
+    : "Belum ada file dipilih.";
+});
+$("uploadPhotosButton").addEventListener("click", uploadPhotosToGallery);
+
 async function getSelections(g){
   const {data,error}=await sb.from("photo_selections").select("photo_id,photos(filename)").eq("gallery_id",g.id);
   if(error){alert("Gagal mengambil rekap pilihan: "+error.message);return [];}
