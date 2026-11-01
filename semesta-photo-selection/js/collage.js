@@ -1,0 +1,77 @@
+const $ = id => document.getElementById(id);
+const canvas=$("collageCanvas"), ctx=canvas.getContext("2d");
+const state={format:"feed",background:"#ffffff",gap:12,photos:[],slots:[],selected:-1,drag:null};
+const formats={feed:{w:1080,h:1350,label:"Instagram Feed"},story:{w:1080,h:1920,label:"Instagram Story"}};
+const templates=[
+ {id:"auto",name:"Otomatis sesuai jumlah foto",layout:(n,w,h,g)=>gridLayout(n,w,h,g)},
+ {id:"hero",name:"1 foto utama + pendukung",layout:(n,w,h,g)=>heroLayout(n,w,h,g)},
+ {id:"stack",name:"Kolase vertikal",layout:(n,w,h,g)=>stackLayout(n,w,h,g)},
+ {id:"equal",name:"Grid seragam",layout:(n,w,h,g)=>gridLayout(n,w,h,g)}
+];
+function gridLayout(n,w,h,g){
+ if(!n)return[]; const cols=n===1?1:n===2?2:n<=4?2:3, rows=Math.ceil(n/cols), cellW=(w-g*(cols+1))/cols,cellH=(h-g*(rows+1))/rows;
+ return Array.from({length:n},(_,i)=>({x:g+(i%cols)*(cellW+g),y:g+Math.floor(i/cols)*(cellH+g),w:cellW,h:cellH,scale:1,ox:0,oy:0}));
+}
+function heroLayout(n,w,h,g){
+ if(n<2)return gridLayout(n,w,h,g);
+ const heroH=h*.58-g*1.5, smallH=(h-heroH-g*2)/2, count=n-1, cols=Math.min(3,count), cellW=(w-g*(cols+1))/cols;
+ const arr=[{x:g,y:g,w:w-2*g,h:heroH,scale:1,ox:0,oy:0}];
+ for(let i=0;i<count;i++)arr.push({x:g+(i%cols)*(cellW+g),y:g+heroH+g+(Math.floor(i/cols))* (smallH+g),w:cellW,h:smallH,scale:1,ox:0,oy:0});
+ return arr;
+}
+function stackLayout(n,w,h,g){
+ if(!n)return[];const cellH=(h-g*(n+1))/n;return Array.from({length:n},(_,i)=>({x:g,y:g+i*(cellH+g),w:w-2*g,h:cellH,scale:1,ox:0,oy:0}));
+}
+function activeTemplate(){return templates.find(t=>t.id===$("templateSelect").value)||templates[0]}
+function resetSlots(){const f=formats[state.format];state.slots=activeTemplate().layout(state.photos.length,f.w,f.h,state.gap);state.selected=state.photos.length?Math.min(state.selected<0?0:state.selected,state.photos.length-1):-1;draw();renderControls()}
+function coverParams(img,slot){
+ const scale=Math.max(slot.w/img.width,slot.h/img.height)*(slot.scale||1),dw=img.width*scale,dh=img.height*scale;
+ const cx=slot.x+slot.w/2+(slot.ox||0),cy=slot.y+slot.h/2+(slot.oy||0);
+ return {sx:(img.width-(slot.w/scale))/2-(slot.ox||0)/scale,sy:(img.height-(slot.h/scale))/2-(slot.oy||0)/scale,sw:slot.w/scale,sh:slot.h/scale};
+}
+function draw(){
+ const f=formats[state.format];ctx.clearRect(0,0,f.w,f.h);ctx.fillStyle=state.background;ctx.fillRect(0,0,f.w,f.h);
+ state.photos.forEach((photo,i)=>{
+  const slot=state.slots[i];if(!slot)return;
+  ctx.save();ctx.beginPath();ctx.rect(slot.x,slot.y,slot.w,slot.h);ctx.clip();
+  const img=photo.img;const scale=Math.max(slot.w/img.width,slot.h/img.height)*(slot.scale||1),dw=img.width*scale,dh=img.height*scale;
+  const dx=slot.x+(slot.w-dw)/2+(slot.ox||0),dy=slot.y+(slot.h-dh)/2+(slot.oy||0);
+  ctx.drawImage(img,dx,dy,dw,dh);ctx.restore();
+  if(i===state.selected){ctx.save();ctx.strokeStyle="#e6d78d";ctx.lineWidth=8;ctx.strokeRect(slot.x+4,slot.y+4,slot.w-8,slot.h-8);ctx.restore();}
+ });
+ $("canvasStatus").textContent=state.photos.length?`${state.photos.length} foto · ${state.selected>=0?"Foto "+(state.selected+1)+" dipilih":"Pilih foto pada preview"}`:"Tambahkan foto untuk mulai membuat kolase.";
+}
+function renderControls(){
+ $("photoCounter").textContent=`${state.photos.length} foto`;
+ $("photoList").innerHTML=state.photos.length?state.photos.map((p,i)=>`<button class="photo-list-item ${i===state.selected?"active":""}" data-photo="${i}"><span>${i+1}</span><b title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</b><small>×</small></button>`).join(""):'<div class="tool-empty">Belum ada foto. Tambahkan foto dari komputer.</div>';
+ $("selectedPhoto").innerHTML='<option value="">Pilih foto</option>'+state.photos.map((p,i)=>`<option value="${i}" ${i===state.selected?"selected":""}>${i+1}. ${escapeHtml(p.name)}</option>`).join("");
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+$("templateSelect").innerHTML=templates.map(t=>`<option value="${t.id}">${t.name}</option>`).join("");
+$("photoInput").addEventListener("change",async e=>{
+ const files=[...e.target.files].filter(f=>f.type.startsWith("image/"));
+ for(const file of files){const url=URL.createObjectURL(file),img=new Image();img.src=url;await img.decode();state.photos.push({name:file.name,file,img,url});}
+ e.target.value="";resetSlots();
+});
+$("photoList").addEventListener("click",e=>{
+ const item=e.target.closest("[data-photo]");if(!item)return;const i=Number(item.dataset.photo);
+ if(e.target.tagName==="SMALL"){URL.revokeObjectURL(state.photos[i].url);state.photos.splice(i,1);resetSlots();return;}
+ state.selected=i;draw();renderControls();
+});
+$("selectedPhoto").addEventListener("change",e=>{state.selected=Number(e.target.value);draw();renderControls()});
+$("formatSelect").addEventListener("change",e=>{state.format=e.target.value;const f=formats[state.format];canvas.width=f.w;canvas.height=f.h;canvas.style.aspectRatio=`${f.w}/${f.h}`;$("canvasDimensions").textContent=`${f.w} × ${f.h} px · ${f.label}`;resetSlots()});
+$("templateSelect").addEventListener("change",resetSlots);
+$("gapRange").addEventListener("input",e=>{state.gap=Number(e.target.value);$("gapValue").textContent=state.gap+" px";resetSlots()});
+document.querySelectorAll(".swatch").forEach(b=>b.addEventListener("click",()=>{state.background=b.dataset.color;document.querySelectorAll(".swatch").forEach(x=>x.classList.toggle("active",x===b));$("customBackground").value=state.background;draw()}));
+$("customBackground").addEventListener("input",e=>{state.background=e.target.value;document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("active"));draw()});
+function reorder(direction){if(state.selected<0)return;const j=state.selected+direction;if(j<0||j>=state.photos.length)return;[state.photos[state.selected],state.photos[j]]=[state.photos[j],state.photos[state.selected]];state.selected=j;resetSlots()}
+$("moveUp").addEventListener("click",()=>reorder(-1));$("moveDown").addEventListener("click",()=>reorder(1));
+$("removePhoto").addEventListener("click",()=>{if(state.selected<0)return;URL.revokeObjectURL(state.photos[state.selected].url);state.photos.splice(state.selected,1);resetSlots()});
+function canvasPoint(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
+function hitTest(p){for(let i=state.slots.length-1;i>=0;i--){const s=state.slots[i];if(p.x>=s.x&&p.x<=s.x+s.w&&p.y>=s.y&&p.y<=s.y+s.h)return i;}return -1}
+canvas.addEventListener("pointerdown",e=>{const p=canvasPoint(e),i=hitTest(p);if(i<0)return;state.selected=i;state.drag={i,x:p.x,y:p.y,ox:state.slots[i].ox||0,oy:state.slots[i].oy||0};canvas.setPointerCapture(e.pointerId);draw();renderControls()});
+canvas.addEventListener("pointermove",e=>{if(!state.drag)return;const p=canvasPoint(e),d=state.drag,s=state.slots[d.i];s.ox=d.ox+(p.x-d.x);s.oy=d.oy+(p.y-d.y);draw()});
+canvas.addEventListener("pointerup",()=>state.drag=null);canvas.addEventListener("pointercancel",()=>state.drag=null);
+function exportCanvas(type){if(!state.photos.length){alert("Tambahkan foto terlebih dahulu.");return;}draw();canvas.toBlob(blob=>{if(!blob){alert("Export gagal.");return;}const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=`semesta-collage-${state.format}.${type==="image/jpeg"?"jpg":"png"}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);},type,type==="image/jpeg"?.94:undefined)}
+$("downloadJpg").addEventListener("click",()=>exportCanvas("image/jpeg"));$("downloadPng").addEventListener("click",()=>exportCanvas("image/png"));
+const initial=formats.feed;canvas.width=initial.w;canvas.height=initial.h;canvas.style.aspectRatio=`${initial.w}/${initial.h}`;renderControls();draw();

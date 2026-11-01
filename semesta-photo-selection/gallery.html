@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galeri Klien — Semesta Photo Selection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="client-body">
+  <header class="client-header client-header-v5">
+    <a class="brand" href="https://semestaphotovideo.my.id/" target="_blank" rel="noopener"><span class="brand-wordmark">SEMESTA</span><span class="brand-subtitle">PHOTO SELECTION</span></a>
+    <nav class="client-quick-links" aria-label="Layanan Semesta">
+      <a class="quick-link" href="https://semestaphotovideo.my.id/" target="_blank" rel="noopener"><span>⌂</span> Website Resmi</a>
+      <div class="help-menu">
+        <button class="quick-link" type="button" id="helpMenuButton"><span>☏</span> WA Bantuan Admin ▾</button>
+        <div class="help-dropdown" id="helpDropdown">
+          <a href="https://wa.me/6285800007878?text=Halo%20Admin%20Semesta%2C%20saya%20membutuhkan%20bantuan%20terkait%20galeri%20foto." target="_blank" rel="noopener">Admin 1 · 0858 0000 7878</a>
+          <a href="https://wa.me/6282324714989?text=Halo%20Admin%20Semesta%2C%20saya%20membutuhkan%20bantuan%20terkait%20galeri%20foto." target="_blank" rel="noopener">Admin 2 · 0823 2471 4989</a>
+        </div>
+      </div>
+      <a class="quick-link quick-link-accent" id="progressLink" href="progress.html"><span>✓</span> Cek Progress Editing</a>
+    </nav>
+  </header>
+  <main class="client-main">
+    <div class="client-intro"><span class="eyebrow">YOUR PHOTO GALLERY</span><h1 id="clientGalleryTitle">Galeri Foto Anda</h1><p id="clientGreeting">Silakan pilih foto yang ingin diproses untuk editing.</p></div>
+    <div class="selection-summary"><div><span class="muted">Foto terpilih</span><strong><span id="selectedCount">0</span><small id="selectionLimit"> / 20 foto</small></strong></div><div class="progress-track"><div id="progressBar"></div></div><button class="btn btn-primary" id="submitSelection">Kirim Pilihan Foto</button></div>
+    <div class="gallery-toolbar"><div><b>Preview Foto</b><small id="photoCount">Contoh tampilan galeri</small></div><button class="filter-btn active" id="allFilter">Semua Foto</button><button class="filter-btn" id="selectedFilter">♥ Terpilih</button></div>
+    <div class="photo-grid" id="photoGrid"></div>
+    <p class="demo-warning" id="galleryNotice">Galeri foto Semesta.</p>
+  </main>
+  <div class="modal" id="previewModal" aria-hidden="true"><button class="modal-close" id="closePreview">×</button><button class="modal-arrow prev" id="prevPhoto">‹</button><div class="preview-content"><img class="preview-art" id="previewArt" alt="Preview foto" style="object-fit:contain;max-width:100%;max-height:70vh;"><div class="preview-caption"><span id="previewName">Foto</span><button class="btn btn-primary" id="previewSelect">♡ Pilih Foto</button></div></div><button class="modal-arrow next" id="nextPhoto">›</button></div>
+  <script>
+    const q = new URLSearchParams(location.search);
+    const token = q.get("token");
+    if (token) document.getElementById("progressLink").href = `progress.html?token=${encodeURIComponent(token)}`;
+    const helpBtn = document.getElementById("helpMenuButton");
+    const helpDropdown = document.getElementById("helpDropdown");
+    helpBtn.addEventListener("click", () => helpDropdown.classList.toggle("show"));
+    document.addEventListener("click", e => { if (!e.target.closest(".help-menu")) helpDropdown.classList.remove("show"); });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/gallery-v10.js"></script>
+</body>
+</html>

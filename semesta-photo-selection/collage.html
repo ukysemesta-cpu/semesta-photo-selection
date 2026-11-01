@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Collage Studio — Semesta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="collage-body">
+<header class="collage-topbar">
+  <a class="brand" href="index.html"><span class="brand-wordmark">SEMESTA</span><span class="brand-subtitle">COLLAGE STUDIO</span></a>
+  <div class="collage-top-actions"><a class="quick-link" href="index.html">← Dashboard</a><button class="btn btn-primary" id="downloadJpg">Download JPG</button><button class="btn btn-ghost" id="downloadPng">Download PNG</button></div>
+</header>
+<main class="collage-app">
+  <aside class="collage-controls">
+    <div class="collage-heading"><span class="eyebrow">PHOTO LAYOUT EDITOR</span><h1>Collage Studio</h1><p class="muted">Susun foto klien untuk Instagram Feed dan Story.</p></div>
+    <section class="tool-section">
+      <label class="tool-label" for="formatSelect">Format kanvas</label>
+      <select id="formatSelect"><option value="feed">Instagram Feed Portrait · 1080 × 1350</option><option value="story">Instagram Story · 1080 × 1920</option></select>
+      <label class="tool-label" for="templateSelect">Template layout</label>
+      <select id="templateSelect"></select>
+      <div class="tool-help">Pilih template otomatis, lalu geser foto pada kanvas untuk mengatur posisi secara manual.</div>
+    </section>
+    <section class="tool-section">
+      <div class="tool-section-head"><b>Foto</b><span id="photoCounter">0 foto</span></div>
+      <label class="upload-button" for="photoInput">＋ Tambahkan Foto</label>
+      <input id="photoInput" type="file" accept="image/*" multiple hidden>
+      <div id="photoList" class="photo-list"><div class="tool-empty">Belum ada foto. Tambahkan foto dari komputer.</div></div>
+    </section>
+    <section class="tool-section">
+      <label class="tool-label" for="backgroundSelect">Warna background</label>
+      <div class="background-row">
+        <button class="swatch active" data-color="#ffffff" style="background:#fff" aria-label="Putih"></button>
+        <button class="swatch" data-color="#111111" style="background:#111" aria-label="Hitam"></button>
+        <button class="swatch" data-color="#174b38" style="background:#174b38" aria-label="Hijau tua"></button>
+        <button class="swatch" data-color="#efe3a0" style="background:#efe3a0" aria-label="Kuning soft"></button>
+        <input type="color" id="customBackground" value="#ffffff" aria-label="Warna custom">
+      </div>
+      <label class="tool-label" for="gapRange">Jarak antar foto <span id="gapValue">12 px</span></label>
+      <input type="range" id="gapRange" min="0" max="48" value="12">
+    </section>
+    <section class="tool-section">
+      <div class="tool-section-head"><b>Editor manual</b><span class="muted">Pilih foto lalu geser</span></div>
+      <label class="tool-label" for="selectedPhoto">Foto aktif</label>
+      <select id="selectedPhoto"><option value="">Pilih foto</option></select>
+      <div class="tool-actions">
+        <button class="btn btn-ghost" id="moveUp">Ke depan ↑</button>
+        <button class="btn btn-ghost" id="moveDown">Ke belakang ↓</button>
+        <button class="btn btn-ghost" id="removePhoto">Hapus foto</button>
+      </div>
+      <div class="tool-help">Tip: klik foto pada preview untuk memilihnya. Tarik foto untuk menggeser crop/posisi. Template dapat diganti kapan saja.</div>
+    </section>
+  </aside>
+  <section class="collage-workspace">
+    <div class="workspace-head"><div><b>Live Preview</b><small id="canvasDimensions">1080 × 1350 px · Instagram Feed</small></div><span class="preview-hint">Klik dan geser foto untuk mengatur komposisi</span></div>
+    <div class="canvas-stage"><canvas id="collageCanvas" width="1080" height="1350" aria-label="Preview kolase"></canvas></div>
+    <div class="workspace-footer"><span id="canvasStatus">Tambahkan foto untuk mulai membuat kolase.</span><span>Export resolusi penuh · 300 DPI-ready pixel dimensions</span></div>
+  </section>
+</main>
+<script src="js/collage.js"></script>
+</body></html>

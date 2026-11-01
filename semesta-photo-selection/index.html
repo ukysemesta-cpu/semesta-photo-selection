@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Semesta Photo Selection — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="index.html"><span class="brand-wordmark">SEMESTA</span><span class="brand-subtitle">PHOTO SELECTION</span></a>
+    <div class="side-label">MENU UTAMA</div>
+    <nav class="side-nav">
+      <a class="nav-link active" href="#dashboard"><span>▦</span> Dashboard</a>
+      <a class="nav-link" href="#galleries"><span>▧</span> Galeri Klien</a>
+      <a class="nav-link" href="#create"><span>＋</span> Buat Galeri</a>
+      <a class="nav-link" href="#settings"><span>⚙</span> Pengaturan</a>
+        <a class="nav-link" href="collage.html"><span>▧</span> Collage Studio</a>
+    </nav>
+    <div class="sidebar-bottom"><div class="sidebar-note"><span class="status-dot"></span><span>Mode pengembangan<br><b>Data masih lokal</b></span></div><small>SEMESTA GROUP · 2026</small></div>
+  </aside>
+  <main class="main-area">
+    <header class="topbar"><button class="mobile-menu" id="mobileMenu" aria-label="Buka menu">☰</button><div><span class="eyebrow">ADMINISTRATOR</span><h1>Dashboard</h1></div><div class="topbar-right"><span class="avatar">SA</span><span class="admin-label" id="signedInEmail">Semesta Admin</span><button class="mini-action" id="logoutButton" type="button">Keluar</button></div></header>
+    <section class="page-section" id="dashboard">
+      <div class="welcome-row"><div><p class="muted">Selamat datang kembali,</p><h2>Kelola galeri foto klien Anda.</h2><p class="muted">Buat tautan galeri, pantau pilihan foto, dan siapkan proses editing.</p></div><a class="btn btn-primary" href="#create">＋ Buat Galeri Baru</a></div>
+      <div class="stats-grid">
+        <button class="stat-card stat-clickable" type="button" data-stat="all" aria-label="Lihat semua galeri"><span class="stat-icon">▧</span><span class="stat-label">Total Galeri</span><strong id="totalGalleries">0</strong><small>Lihat semua klien dan galeri ↗</small></button>
+        <button class="stat-card stat-clickable" type="button" data-stat="pending" aria-label="Lihat galeri menunggu seleksi"><span class="stat-icon">◷</span><span class="stat-label">Menunggu Seleksi</span><strong id="pendingGalleries">0</strong><small>Lihat klien yang belum submit ↗</small></button>
+        <button class="stat-card stat-clickable" type="button" data-stat="submitted" aria-label="Lihat galeri sudah submit"><span class="stat-icon">♥</span><span class="stat-label">Sudah Submit</span><strong id="submittedGalleries">0</strong><small>Lihat klien yang sudah submit ↗</small></button>
+      </div>
+      <section class="panel" id="galleries"><div class="panel-heading"><div><span class="eyebrow">MANAJEMEN</span><h3>Galeri Klien</h3></div><a class="text-link" href="#create">＋ Buat galeri</a></div>
+        <div class="table-wrap"><table><thead><tr><th>NAMA KLIEN</th><th>NAMA GALERI</th><th>KUOTA PILIHAN</th><th>BATAS WAKTU</th><th>STATUS</th><th>LINK KLIEN &amp; AKSI</th></tr></thead><tbody id="galleryTable"><tr><td colspan="6" class="empty-cell">Belum ada galeri. Buat galeri pertama Anda di bawah.</td></tr></tbody></table></div>
+      </section>
+      <section class="panel form-panel" id="create"><div class="panel-heading"><div><span class="eyebrow">GALERI BARU</span><h3 id="formTitle">Buat Galeri Klien</h3><p class="muted">Atur informasi, kuota pilihan, dan tenggat waktu galeri klien.</p></div></div>
+        <form id="galleryForm" class="form-grid">
+          <input type="hidden" name="editingId" id="editingId">
+          <label>Nama klien<input name="clientName" required placeholder="Contoh: Budi Santoso"></label>
+          <label>Nama galeri<input name="galleryName" required placeholder="Contoh: Wedding Budi & Ani"></label>
+          <label class="full">Link folder Google Drive<input name="driveUrl" type="url" placeholder="https://drive.google.com/drive/folders/..."><small>Folder akan dihubungkan ke Google Drive pada tahap integrasi berikutnya.</small></label>
+          <label>Kuota maksimal foto<input name="selectionLimit" type="number" min="0" step="1" required value="20" placeholder="Contoh: 25"><small>Isi angka sendiri. Masukkan 0 jika tanpa batas.</small></label>
+          <label>Batas waktu memilih<select name="durationDays" required><option value="7">7 hari</option><option value="14" selected>14 hari</option><option value="21">21 hari</option><option value="30">30 hari</option></select><small>Hitungan dimulai sejak galeri dibuat atau diperbarui.</small></label>
+          <label>Status galeri<select name="galleryStatus"><option value="active">Aktif — klien dapat memilih</option><option value="draft">Draft — belum dibagikan</option></select></label>
+          <label>Jenis paket<select name="packageType"><option value="file_only">Paket File Saja</option><option value="print_album">Paket File + Cetak dan Album</option></select></label>
+          <div class="form-actions full"><button class="btn btn-primary" type="submit" id="saveGalleryBtn">Simpan Galeri</button><button class="btn btn-ghost" type="button" id="cancelEdit" hidden>Batal Edit</button><button class="btn btn-ghost" type="reset">Kosongkan</button></div>
+        </form>
+      </section>
+      <section class="panel" id="settings"><div class="panel-heading"><div><span class="eyebrow">KONFIGURASI</span><h3>WhatsApp Admin</h3><p class="muted">Nomor tujuan pesan pilihan foto klien.</p></div></div>
+        <div class="admin-numbers"><div class="number-row"><span class="wa-icon">◉</span><div><b>Admin 1 · Utama</b><small>6285800007878</small></div><span class="pill pill-green">Aktif</span></div><div class="number-row"><span class="wa-icon">◉</span><div><b>Admin 2</b><small>6282324714989</small></div><span class="pill pill-green">Aktif</span></div></div>
+        <p class="notice">Download foto JPG/RAW akan mengambil file asli dari Google Drive setelah integrasi API selesai. Pada prototipe ini, admin dapat mengunduh rekap pilihan foto.</p>
+      </section>
+    </section>
+    <footer>© 2026 Semesta Group · Photo Selection Platform</footer>
+  </main>
+</div>
+<div class="details-modal" id="detailsModal" aria-hidden="true">
+  <div class="details-dialog" role="dialog" aria-modal="true" aria-labelledby="detailsTitle">
+    <div class="details-head"><div><span class="eyebrow">RINCIAN GALERI</span><h3 id="detailsTitle">Daftar Klien</h3></div><button type="button" class="details-close" id="closeDetails" aria-label="Tutup">×</button></div>
+    <p class="muted" id="detailsDescription"></p>
+    <div class="details-list" id="detailsList"></div>
+  </div>
+</div>
+<div class="auth-gate" id="authGate">
+  <form class="auth-card" id="loginForm">
+    <span class="eyebrow">SEMESTA GROUP</span>
+    <h1>Admin Login</h1>
+    <p class="muted">Masuk untuk mengelola galeri foto klien.</p>
+    <label>Email administrator<input id="loginEmail" type="email" autocomplete="username" required placeholder="email admin"></label>
+    <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Password admin"></label>
+    <button class="btn btn-primary" id="loginButton" type="submit">Masuk ke Dashboard</button>
+    <p class="auth-error" id="loginError" role="alert"></p>
+  </form>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/admin-v10.js"></script>
+</body></html>
