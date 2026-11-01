@@ -38,7 +38,7 @@
           <input type="hidden" name="editingId" id="editingId">
           <label>Nama klien<input name="clientName" required placeholder="Contoh: Budi Santoso"></label>
           <label>Nama galeri<input name="galleryName" required placeholder="Contoh: Wedding Budi & Ani"></label>
-          <label class="full">Link folder Google Drive<input name="driveUrl" type="url" placeholder="https://drive.google.com/drive/folders/..."><small>Folder akan dihubungkan ke Google Drive pada tahap integrasi berikutnya.</small></label>
+          <label class="full">Link folder Google Drive<input name="driveUrl" type="url" placeholder="https://drive.google.com/drive/folders/..."><small>Tempel link folder Google Drive yang dibagikan Anyone with the link — Viewer.</small></label>
           <label>Kuota maksimal foto<input name="selectionLimit" type="number" min="0" step="1" required value="20" placeholder="Contoh: 25"><small>Isi angka sendiri. Masukkan 0 jika tanpa batas.</small></label>
           <label>Batas waktu memilih<select name="durationDays" required><option value="7">7 hari</option><option value="14" selected>14 hari</option><option value="21">21 hari</option><option value="30">30 hari</option></select><small>Hitungan dimulai sejak galeri dibuat atau diperbarui.</small></label>
           <label>Status galeri<select name="galleryStatus"><option value="active">Aktif — klien dapat memilih</option><option value="draft">Draft — belum dibagikan</option></select></label>
@@ -48,7 +48,7 @@
       </section>
       <section class="panel" id="settings"><div class="panel-heading"><div><span class="eyebrow">KONFIGURASI</span><h3>WhatsApp Admin</h3><p class="muted">Nomor tujuan pesan pilihan foto klien.</p></div></div>
         <div class="admin-numbers"><div class="number-row"><span class="wa-icon">◉</span><div><b>Admin 1 · Utama</b><small>6285800007878</small></div><span class="pill pill-green">Aktif</span></div><div class="number-row"><span class="wa-icon">◉</span><div><b>Admin 2</b><small>6282324714989</small></div><span class="pill pill-green">Aktif</span></div></div>
-        <p class="notice">Download foto JPG/RAW akan mengambil file asli dari Google Drive setelah integrasi API selesai. Pada prototipe ini, admin dapat mengunduh rekap pilihan foto.</p>
+        <p class="notice">Foto galeri dibaca dari folder Google Drive yang ditautkan pada setiap galeri.</p>
       </section>
     </section>
     <footer>© 2026 Semesta Group · Photo Selection Platform</footer>
@@ -61,6 +61,26 @@
     <div class="details-list" id="detailsList"></div>
   </div>
 </div>
+
+<div class="details-modal" id="photoManagerModal" aria-hidden="true">
+  <div class="details-dialog photo-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="photoManagerTitle">
+    <div class="details-head">
+      <div><span class="eyebrow">PENYIMPANAN PREVIEW</span><h3 id="photoManagerTitle">Kelola Foto</h3></div>
+      <button type="button" class="details-close" id="closePhotoManager" aria-label="Tutup">×</button>
+    </div>
+    <p class="muted" id="photoManagerDescription"></p>
+    <div class="notice photo-storage-notice">
+      Foto dibaca langsung dari folder Google Drive yang ditautkan pada galeri ini. Upload foto seperti biasa ke folder Drive; sistem akan mendeteksi foto baru saat admin membuka atau menyinkronkan galeri.
+      <b>Folder harus dibagikan sebagai Anyone with the link — Viewer.</b>
+    </div>
+    <div class="photo-upload-actions">
+      <button type="button" class="btn btn-primary" id="syncDriveButton">↻ Sinkronkan dari Google Drive</button>
+      <span class="muted" id="photoUploadStatus" role="status">Siap menyinkronkan.</span>
+    </div>
+    <div class="details-list" id="managedPhotoList"><div class="details-empty">Memuat daftar foto...</div></div>
+  </div>
+</div>
+
 <div class="auth-gate" id="authGate">
   <form class="auth-card" id="loginForm">
     <span class="eyebrow">SEMESTA GROUP</span>
