@@ -209,3 +209,7 @@ body{background:#174b35;color:var(--ink)}
  .preview-actions button{font-size:11px;padding:9px 11px}
  .preview-art{touch-action:pan-y}
 }
+
+/* Cross-device draft sync status */
+.draft-sync-status{font-size:11px;color:#718096;margin:10px 0 18px;text-align:center}
+.draft-sync-status.error{color:#b54747}
