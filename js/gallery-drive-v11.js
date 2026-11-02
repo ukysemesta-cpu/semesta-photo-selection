@@ -21,10 +21,37 @@ function render(){
  </article>`).join("")||'<p class="muted">Belum ada foto dalam galeri ini. Silakan hubungi admin.</p>';
  const count=selectedCount(),limit=Number(gallery.selection_limit);
  $("selectedCount").textContent=count;
+ $("reviewCount").textContent=count;
  $("selectionLimit").textContent=limit===0?" / tanpa batas":` / ${limit} foto`;
  $("progressBar").style.width=(limit===0?Math.min(count*5,100):Math.min(count/Math.max(limit,1)*100,100))+"%";
  $("submitSelection").disabled=gallery.selection_status==="submitted";
  if(gallery.selection_status==="submitted")$("submitSelection").textContent="Pilihan Sudah Dikirim";
+}
+function openReview(){
+ renderReviewList();
+ $("reviewModal").classList.add("open");
+ $("reviewModal").setAttribute("aria-hidden","false");
+ document.body.classList.add("review-open");
+}
+function closeReview(){
+ $("reviewModal").classList.remove("open");
+ $("reviewModal").setAttribute("aria-hidden","true");
+ document.body.classList.remove("review-open");
+}
+function renderReviewList(){
+ const chosen=photos.filter(p=>p.selected).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0));
+ $("reviewSubtitle").textContent=gallery?.selection_status==="submitted"
+   ?"Pilihan sudah dikirim dan terkunci."
+   :"Periksa kembali foto. Anda masih bisa membatalkan pilihan sebelum dikirim.";
+ $("reviewFooterCount").textContent=`${chosen.length} foto dipilih`;
+ $("reviewList").innerHTML=chosen.map((p,i)=>`
+   <article class="review-photo" data-review-id="${p.id}">
+     <img src="${escapeHtml(p.preview_url||"")}" alt="${escapeHtml(p.filename)}" loading="lazy"
+       onerror="if(this.dataset.driveId && !this.dataset.fallback){this.dataset.fallback='1';this.src='https://drive.google.com/uc?export=view&id='+encodeURIComponent(this.dataset.driveId)}else{this.style.opacity='.2'}"
+       data-drive-id="${escapeHtml(p.drive_file_id||"")}">
+     <div class="review-photo-meta"><b>${i+1}. ${escapeHtml(p.filename)}</b><small>Foto pilihan Anda</small></div>
+     ${gallery?.selection_status==="submitted"?"":`<button type="button" class="review-remove" data-remove-selection="${p.id}">Batalkan pilihan</button>`}
+   </article>`).join("") || '<div class="review-empty"><b>Belum ada foto pilihan.</b><span>Kembali ke galeri untuk memilih foto favorit Anda.</span></div>';
 }
 function openPreview(id){
  currentIndex=photos.findIndex(p=>p.id===id);if(currentIndex<0)return;
@@ -43,11 +70,22 @@ async function togglePhoto(id){
  const p=photos.find(x=>x.id===id);if(!p)return;
  if(!p.selected&&Number(gallery.selection_limit)>0&&selectedCount()>=Number(gallery.selection_limit)){alert(`Maksimal pilihan ${gallery.selection_limit} foto.`);return;}
  p.selected=!p.selected;render();
+ if($("reviewModal").classList.contains("open"))renderReviewList();
 }
 $("photoGrid").addEventListener("click",e=>{
  const b=e.target.closest("[data-select]");if(b){e.stopPropagation();togglePhoto(b.dataset.select);return;}
  const card=e.target.closest("[data-id]");if(card)openPreview(card.dataset.id);
 });
+$("openReview").addEventListener("click",openReview);
+$("closeReview").addEventListener("click",closeReview);
+$("reviewDone").addEventListener("click",closeReview);
+$("reviewModal").addEventListener("click",e=>{if(e.target===$("reviewModal"))closeReview();});
+$("reviewList").addEventListener("click",async e=>{
+ const button=e.target.closest("[data-remove-selection]");
+ if(!button)return;
+ await togglePhoto(button.dataset.removeSelection);
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape" && $("reviewModal").classList.contains("open"))closeReview();});
 $("allFilter").addEventListener("click",()=>{showingSelected=false;showingHighlight=false;$("allFilter").classList.add("active");$("selectedFilter").classList.remove("active");$("highlightFilter").classList.remove("active");render();});
 $("selectedFilter").addEventListener("click",()=>{showingSelected=true;showingHighlight=false;$("selectedFilter").classList.add("active");$("allFilter").classList.remove("active");$("highlightFilter").classList.remove("active");render();});
 $("highlightFilter").addEventListener("click",()=>{showingHighlight=true;showingSelected=false;$("highlightFilter").classList.add("active");$("allFilter").classList.remove("active");$("selectedFilter").classList.remove("active");render();});
