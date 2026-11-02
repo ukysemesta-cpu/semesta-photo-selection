@@ -19,77 +19,9 @@ let selectedPhotoCounts = {};
 let currentUser = null;
 let notificationRefreshTimer = null;
 let adminNotifications = [];
-
-function formatNotificationDate(value) {
-  if (!value) return "Waktu tidak tersedia";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Waktu tidak tersedia";
-  return date.toLocaleString("id-ID", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
-}
-
-function renderNotifications() {
-  const badge = $("notificationBadge");
-  const list = $("notificationList");
-  const summary = $("notificationSummary");
-  if (!badge || !list || !summary) return;
-  const unread = adminNotifications.filter(item => !item.is_read).length;
-  badge.textContent = unread > 99 ? "99+" : String(unread);
-  badge.hidden = unread === 0;
-  summary.textContent = unread ? `${unread} notifikasi belum dibaca` : "Semua notifikasi sudah dibaca";
-  if (!adminNotifications.length) {
-    list.innerHTML = '<div class="notification-empty">Belum ada notifikasi pilihan foto dari klien.</div>';
-    return;
-  }
-  list.innerHTML = adminNotifications.map(item => {
-    const revision = item.notification_type === "revision_submitted";
-    const title = revision ? "Revisi pilihan foto dikirim" : "Pilihan foto berhasil dikirim";
-    return `<article class="notification-item ${item.is_read ? "" : "unread"}" data-notification-id="${escapeHtml(item.id)}">
-      <span class="notification-dot" aria-hidden="true"></span>
-      <div class="notification-item-content">
-        <b>${title}</b>
-        <strong>${escapeHtml(item.client_name || "Klien")} · ${escapeHtml(item.gallery_name || "Galeri")}</strong>
-        <small>${formatNotificationDate(item.created_at)}</small>
-      </div>
-      ${item.is_read ? "" : `<button type="button" class="notification-read-one" data-read-notification="${escapeHtml(item.id)}">Tandai dibaca</button>`}
-    </article>`;
-  }).join("");
-}
-
-async function loadAdminNotifications() {
-  if (!currentUser || !$("notificationList")) return;
-  const { data, error } = await sb.from("admin_notifications")
-    .select("id,gallery_id,client_name,gallery_name,notification_type,created_at,is_read")
-    .order("created_at", { ascending: false })
-    .limit(50);
-  if (error) {
-    console.warn("Notifikasi admin belum dapat dimuat:", error.message);
-    $("notificationList").innerHTML = `<div class="notification-empty">Notifikasi belum tersedia. Jalankan SQL notifikasi terlebih dahulu.</div>`;
-    return;
-  }
-  adminNotifications = data || [];
-  renderNotifications();
-}
-
-async function markNotificationRead(id) {
-  const { error } = await sb.from("admin_notifications").update({ is_read: true }).eq("id", id);
-  if (error) { alert("Gagal memperbarui notifikasi: " + error.message); return; }
-  await loadAdminNotifications();
-}
-
-async function markAllNotificationsRead() {
-  const unreadIds = adminNotifications.filter(item => !item.is_read).map(item => item.id);
-  if (!unreadIds.length) return;
-  const { error } = await sb.from("admin_notifications").update({ is_read: true }).in("id", unreadIds);
-  if (error) { alert("Gagal menandai notifikasi: " + error.message); return; }
-  await loadAdminNotifications();
-}
-
-function startNotificationRefresh() {
-  if (notificationRefreshTimer) clearInterval(notificationRefreshTimer);
-  loadAdminNotifications();
-  notificationRefreshTimer = setInterval(loadAdminNotifications, 30000);
-}
-
+let showArchivedGalleries = false;
+let gallerySearchTerm = "";
+let galleryStatusFilter = "all";
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -117,7 +49,7 @@ function mapGallery(row) {
     status: row.selection_status === "submitted" ? "submitted" : row.gallery_status,
     galleryStatus: row.gallery_status, selectionStatus: row.selection_status,
     editingStatus: row.editing_status || "Belum mulai", packageType: row.package_type || "file_only",
-    submittedAt: row.submitted_at, revisionAllowed: row.revision_allowed === true
+    submittedAt: row.submitted_at, revisionAllowed: row.revision_allowed === true, isArchived: row.is_archived === true
   };
 }
 function clientGalleryUrl(g) {
@@ -152,15 +84,26 @@ async function copyGalleryInvite(g) {
 function isSubmitted(g){return g.selectionStatus==="submitted";}
 function isPending(g){return g.galleryStatus==="active"&&!isSubmitted(g);}
 function render() {
-  $("totalGalleries").textContent=galleries.length;
-  $("pendingGalleries").textContent=galleries.filter(isPending).length;
-  $("submittedGalleries").textContent=galleries.filter(isSubmitted).length;
-  $("activeGalleries").textContent=galleries.filter(g=>g.galleryStatus==="active").length;
-  $("revisionGalleries").textContent=galleries.filter(g=>g.revisionAllowed).length;
-  $("totalSelectedPhotos").textContent=Object.values(selectedPhotoCounts).reduce((sum,n)=>sum+n,0);
+  const activeGalleries = galleries.filter(g => !g.isArchived);
+  $("totalGalleries").textContent=activeGalleries.length;
+  $("pendingGalleries").textContent=activeGalleries.filter(isPending).length;
+  $("submittedGalleries").textContent=activeGalleries.filter(isSubmitted).length;
+  $("activeGalleries").textContent=activeGalleries.filter(g=>g.galleryStatus==="active").length;
+  $("revisionGalleries").textContent=activeGalleries.filter(g=>g.revisionAllowed).length;
+  $("totalSelectedPhotos").textContent=activeGalleries.reduce((sum,g)=>sum+(selectedPhotoCounts[g.id]||0),0);
+  const term = gallerySearchTerm.trim().toLocaleLowerCase("id");
+  const rows = galleries.filter(g => g.isArchived === showArchivedGalleries)
+    .filter(g => !term || `${g.clientName} ${g.galleryName}`.toLocaleLowerCase("id").includes(term))
+    .filter(g => galleryStatusFilter==="all" ||
+      (galleryStatusFilter==="pending" && isPending(g)) ||
+      (galleryStatusFilter==="submitted" && isSubmitted(g)) ||
+      (galleryStatusFilter==="draft" && g.galleryStatus==="draft") ||
+      (galleryStatusFilter==="revision" && g.revisionAllowed));
+  $("galleryViewLabel").textContent = showArchivedGalleries ? `Arsip · ${rows.length} galeri` : `Galeri aktif · ${rows.length} galeri`;
+  $("toggleArchived").textContent = showArchivedGalleries ? "Kembali ke Galeri Aktif" : "Lihat Arsip";
   const body=$("galleryTable");
-  if(!galleries.length){body.innerHTML='<tr><td colspan="6" class="empty-cell">Belum ada galeri. Buat galeri pertama Anda di bawah.</td></tr>';return;}
-  body.innerHTML=galleries.map(g=>{
+  if(!rows.length){body.innerHTML='<tr><td colspan="6" class="empty-cell">'+(showArchivedGalleries?'Belum ada galeri yang diarsipkan.':'Tidak ada galeri yang cocok.')+'</td></tr>';return;}
+  body.innerHTML=rows.map(g=>{
     const statusText=isSubmitted(g)?"Sudah Submit":g.galleryStatus==="active"?"Menunggu Seleksi":"Draft";
     return `<tr>
       <td><b>${escapeHtml(g.clientName)}</b></td>
@@ -179,10 +122,9 @@ function render() {
         <a class="text-link" href="${escapeHtml(clientGalleryUrl(g))}" target="_blank" rel="noopener">Preview</a>
         <button class="mini-action" data-copy="${g.id}">Salin Link</button>
         <button class="mini-action" data-photos="${g.id}">Kelola Foto</button>
-        <button class="mini-action" data-progress-link="${g.id}">Link Progress</button>
         <button class="mini-action" data-edit="${g.id}">Edit</button>
         <button class="mini-action danger" data-delete="${g.id}">Hapus</button>
-        <button class="mini-action" data-export="${g.id}">Rekap</button>
+        <button class="mini-action ${g.isArchived?'':'archive-action'}" data-archive="${g.id}">${g.isArchived?'Pulihkan':'Arsipkan'}</button>
         <button class="mini-action local-download" data-local-download="${g.id}">Download JPG/RAW</button>
         <button class="mini-action local-copy" data-local-copy="${g.id}">Salin ORI → EDIT</button>
       </div></td>
@@ -204,6 +146,10 @@ async function loadGalleries(){
   }
   render();
 }
+$("gallerySearch").addEventListener("input", e => { gallerySearchTerm=e.target.value; render(); });
+$("galleryStatusFilter").addEventListener("change", e => { galleryStatusFilter=e.target.value; render(); });
+$("toggleArchived").addEventListener("click", () => { showArchivedGalleries=!showArchivedGalleries; galleryStatusFilter="all"; $("galleryStatusFilter").value="all"; render(); });
+
 function resetForm(){
   $("galleryForm").reset();$("editingId").value="";$("formTitle").textContent="Buat Galeri Klien";
   $("saveGalleryBtn").textContent="Simpan Galeri";$("cancelEdit").hidden=true;
@@ -496,8 +442,16 @@ async function copyChosenOriToEdit(g){
 $("galleryTable").addEventListener("click",async event=>{
   const t=event.target;
   if(t.closest("[data-copy]")){const g=galleries.find(x=>x.id===t.closest("[data-copy]").dataset.copy);if(g)copyGalleryInvite(g);return;}
-  if(t.closest("[data-progress-link]")){const g=galleries.find(x=>x.id===t.closest("[data-progress-link]").dataset.progressLink);if(g)copyText(clientProgressUrl(g));return;}
   if(t.closest("[data-photos]")){const g=galleries.find(x=>x.id===t.closest("[data-photos]").dataset.photos);if(g)managePhotos(g);return;}
+  if(t.closest("[data-archive]")){
+    const g=galleries.find(x=>x.id===t.closest("[data-archive]").dataset.archive);if(!g)return;
+    const next=!g.isArchived;
+    const verb=next?"mengarsipkan":"memulihkan";
+    if(!confirm(`Yakin ${verb} galeri ${g.galleryName} milik ${g.clientName}? Data, foto, dan riwayat pilihan tidak dihapus.`))return;
+    const {error}=await sb.from("galleries").update({is_archived:next}).eq("id",g.id);
+    if(error){alert("Gagal mengubah arsip: "+error.message+"\\nPastikan SQL manajemen galeri sudah dijalankan.");return;}
+    g.isArchived=next;render();alert(next?"Galeri berhasil diarsipkan.":"Galeri berhasil dipulihkan.");return;
+  }
   if(t.closest("[data-edit]")){const g=galleries.find(x=>x.id===t.closest("[data-edit]").dataset.edit);if(!g)return;
     const f=$("galleryForm");$("editingId").value=g.id;f.elements.clientName.value=g.clientName;f.elements.galleryName.value=g.galleryName;
     f.elements.driveUrl.value=g.driveUrl;f.elements.selectionLimit.value=g.limit;f.elements.durationDays.value=String(g.durationDays);
@@ -508,7 +462,6 @@ $("galleryTable").addEventListener("click",async event=>{
       const {error}=await sb.from("galleries").delete().eq("id",g.id);
       if(error)alert("Gagal menghapus: "+error.message);else{await loadGalleries();alert("Galeri dihapus dari database.");}
     }return;}
-  if(t.closest("[data-export]")){const g=galleries.find(x=>x.id===t.closest("[data-export]").dataset.export);if(g)exportRecap(g);return;}
   if(t.closest("[data-local-download]")){const g=galleries.find(x=>x.id===t.closest("[data-local-download]").dataset.localDownload);if(g)downloadChosenFromComputer(g);return;}
   if(t.closest("[data-local-copy]")){const g=galleries.find(x=>x.id===t.closest("[data-local-copy]").dataset.localCopy);if(g)copyChosenOriToEdit(g);return;}
 });
@@ -529,26 +482,6 @@ function openDetails(filter){
 document.querySelectorAll("[data-stat]").forEach(card=>card.addEventListener("click",()=>openDetails(card.dataset.stat)));
 $("closeDetails").addEventListener("click",()=>{$("detailsModal").classList.remove("open");$("detailsModal").setAttribute("aria-hidden","true")});
 $("detailsModal").addEventListener("click",e=>{if(e.target===$("detailsModal"))$("closeDetails").click()});
-
-$("notificationBell")?.addEventListener("click", async () => {
-  const panel = $("notificationPanel");
-  const willOpen = panel.hidden;
-  panel.hidden = !willOpen;
-  $("notificationBell").setAttribute("aria-expanded", String(willOpen));
-  if (willOpen) await loadAdminNotifications();
-});
-$("notificationList")?.addEventListener("click", async event => {
-  const button = event.target.closest("[data-read-notification]");
-  if (button) await markNotificationRead(button.dataset.readNotification);
-});
-$("markAllNotificationsRead")?.addEventListener("click", markAllNotificationsRead);
-document.addEventListener("click", event => {
-  const wrap = document.querySelector(".notification-wrap");
-  if (wrap && !wrap.contains(event.target)) {
-    $("notificationPanel").hidden = true;
-    $("notificationBell").setAttribute("aria-expanded", "false");
-  }
-});
 
 function showLoginError(message) {
   $("loginError").textContent = message;
@@ -584,7 +517,6 @@ async function acceptSession(session) {
     $("signedInEmail").textContent = profile.display_name || currentUser.email;
     $("authGate").classList.remove("show");
     await loadGalleries();
-    startNotificationRefresh();
     return true;
   } catch (err) {
     console.error("Admin verification failed:", err);
