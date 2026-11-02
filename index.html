@@ -5,7 +5,7 @@
   <title>Semesta Photo Selection — Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20261102-stats-v2">
 <style>
 .highlight-admin-summary{display:flex;flex-direction:column;gap:4px;padding:12px 14px;margin-bottom:10px;border:1px solid #e7dfb4;border-radius:12px;background:#fffdf2}
 .highlight-admin-summary small,.photo-item-info small{display:block;color:#64748b;font-size:12px;margin-top:3px}
@@ -57,7 +57,7 @@
         <button class="stat-card stat-clickable" type="button" data-stat="submitted" aria-label="Lihat galeri sudah submit"><span class="stat-icon">♥</span><span class="stat-label">Sudah Submit</span><strong id="submittedGalleries">0</strong><small>Lihat klien yang sudah submit ↗</small></button>
         <button class="stat-card stat-clickable" type="button" data-stat="active" aria-label="Lihat galeri aktif"><span class="stat-icon">●</span><span class="stat-label">Galeri Aktif</span><strong id="activeGalleries">0</strong><small>Galeri dengan status aktif ↗</small></button>
         <button class="stat-card stat-clickable" type="button" data-stat="revision" aria-label="Lihat galeri akses revisi"><span class="stat-icon">↻</span><span class="stat-label">Akses Revisi Terbuka</span><strong id="revisionGalleries">0</strong><small>Menunggu klien mengirim revisi ↗</small></button>
-        <div class="stat-card"><span class="stat-icon">♥</span><span class="stat-label">Total Foto Dipilih</span><strong id="totalSelectedPhotos">0</strong><small>Akumulasi foto final seluruh galeri</small></div>
+        <button class="stat-card stat-clickable" type="button" data-stat="selected" aria-label="Lihat galeri dengan foto terpilih"><span class="stat-icon">♥</span><span class="stat-label">Total Foto Dipilih</span><strong id="totalSelectedPhotos">0</strong><small>Lihat rincian foto final per galeri ↗</small></button>
       </div>
       <section class="panel" id="galleries"><div class="panel-heading"><div><span class="eyebrow">MANAJEMEN</span><h3>Galeri Klien</h3></div><a class="text-link" href="#create">＋ Buat galeri</a></div>
         <div class="table-wrap"><table><thead><tr><th>NAMA KLIEN</th><th>NAMA GALERI</th><th>KUOTA PILIHAN</th><th>BATAS WAKTU</th><th>STATUS</th><th>LINK KLIEN &amp; AKSI</th></tr></thead><tbody id="galleryTable"><tr><td colspan="6" class="empty-cell">Belum ada galeri. Buat galeri pertama Anda di bawah.</td></tr></tbody></table></div>
@@ -130,5 +130,5 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-config.js"></script>
-<script src="js/admin-drive-v11.js?v=20261102-dashboard-stats1"></script>
+<script src="js/admin-drive-v11.js?v=20261102-dashboard-stats2"></script>
 </body></html>
