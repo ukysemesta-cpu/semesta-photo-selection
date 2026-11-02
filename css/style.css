@@ -324,3 +324,10 @@ body{background:#174b35;color:var(--ink)}
 #previewArt.image-failed{opacity:.35}
 @keyframes semesta-image-shimmer{to{background-position-x:-220%}}
 @media(prefers-reduced-motion:reduce){.photo-card::before,.review-photo.image-loading img{animation:none}.photo-card .photo-thumb,.review-photo img.review-thumb{transition:none}}
+
+
+/* SAFE PURGE V1 — archive retention and permanent-delete affordance */
+.archive-retention-note{display:inline-block;padding:5px 7px;margin:2px;border-radius:6px;background:#f7f4e5;color:#75652d;font:600 10px "DM Sans";white-space:normal}
+.mini-action[data-purge]{background:#fff0f0;border-color:#e9bcbc;color:#9d3030;font-weight:700}
+.mini-action[data-purge]:hover{background:#ffe3e3}
+.mini-action:disabled{opacity:.55;cursor:wait}
