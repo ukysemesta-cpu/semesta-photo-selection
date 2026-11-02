@@ -29,13 +29,19 @@ function render(){
 }
 function openReview(){
  renderReviewList();
- $("reviewModal").classList.add("open");
- $("reviewModal").setAttribute("aria-hidden","false");
+ const modal = $("reviewModal");
+ modal.classList.add("open");
+ modal.style.display = "flex";
+ modal.style.visibility = "visible";
+ modal.style.opacity = "1";
+ modal.setAttribute("aria-hidden","false");
  document.body.classList.add("review-open");
 }
 function closeReview(){
- $("reviewModal").classList.remove("open");
- $("reviewModal").setAttribute("aria-hidden","true");
+ const modal = $("reviewModal");
+ modal.classList.remove("open");
+ modal.style.display = "none";
+ modal.setAttribute("aria-hidden","true");
  document.body.classList.remove("review-open");
 }
 function renderReviewList(){
@@ -76,7 +82,15 @@ $("photoGrid").addEventListener("click",e=>{
  const b=e.target.closest("[data-select]");if(b){e.stopPropagation();togglePhoto(b.dataset.select);return;}
  const card=e.target.closest("[data-id]");if(card)openPreview(card.dataset.id);
 });
-$("openReview").addEventListener("click",openReview);
+// Delegated capture handler: remains reliable if gallery controls are re-rendered.
+document.addEventListener("click", function(event) {
+ const trigger = event.target.closest("#openReview");
+ if (trigger) {
+   event.preventDefault();
+   event.stopPropagation();
+   openReview();
+ }
+}, true);
 $("closeReview").addEventListener("click",closeReview);
 $("reviewDone").addEventListener("click",closeReview);
 $("reviewModal").addEventListener("click",e=>{if(e.target===$("reviewModal"))closeReview();});
