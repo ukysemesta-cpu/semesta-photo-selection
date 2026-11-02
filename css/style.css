@@ -193,3 +193,19 @@ body{background:#174b35;color:var(--ink)}
 #reviewModal.review-modal{pointer-events:none}
 #reviewModal .review-panel{pointer-events:auto;position:relative;z-index:100000}
 #openReview{position:relative;z-index:2;pointer-events:auto;cursor:pointer}
+
+/* Swipe selection mode */
+.swipe-mode-btn{white-space:nowrap}
+.preview-caption-info{display:flex;flex-direction:column;gap:4px;min-width:0}
+.preview-caption-info small{font-size:10px;color:#ffffffb8}
+.preview-actions{display:flex;gap:8px;align-items:center}
+#previewSkip{background:#ffffff18;color:#fff;border:1px solid #ffffff55}
+#previewSelect:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:650px){
+ .gallery-filters .swipe-mode-btn{flex:1}
+ .modal{padding:55px 12px 25px}
+ .preview-caption{gap:10px;align-items:flex-start}
+ .preview-actions{flex-direction:column;align-items:stretch}
+ .preview-actions button{font-size:11px;padding:9px 11px}
+ .preview-art{touch-action:pan-y}
+}
