@@ -49,7 +49,7 @@ function mapGallery(row) {
     status: row.selection_status === "submitted" ? "submitted" : row.gallery_status,
     galleryStatus: row.gallery_status, selectionStatus: row.selection_status,
     editingStatus: row.editing_status || "Belum mulai", packageType: row.package_type || "file_only",
-    submittedAt: row.submitted_at, revisionAllowed: row.revision_allowed === true, isArchived: row.is_archived === true
+    submittedAt: row.submitted_at, revisionAllowed: row.revision_allowed === true, isArchived: row.is_archived === true, archivedAt: row.archived_at || null
   };
 }
 function clientGalleryUrl(g) {
@@ -123,8 +123,10 @@ function render() {
         <button class="mini-action" data-copy="${g.id}">Salin Link</button>
         <button class="mini-action" data-photos="${g.id}">Kelola Foto</button>
         <button class="mini-action" data-edit="${g.id}">Edit</button>
-        <button class="mini-action danger" data-delete="${g.id}">Hapus</button>
-        <button class="mini-action ${g.isArchived?'':'archive-action'}" data-archive="${g.id}">${g.isArchived?'Pulihkan':'Arsipkan'}</button>
+        ${g.isArchived
+          ? `<button class="mini-action danger" data-purge="${g.id}">Hapus Permanen</button>`
+          : `<button class="mini-action archive-action" data-archive="${g.id}">Arsipkan</button>`}
+        ${g.isArchived ? `<button class="mini-action" data-archive="${g.id}">Pulihkan</button>` : ""}
         <button class="mini-action local-download" data-local-download="${g.id}">Download JPG/RAW</button>
         <button class="mini-action local-copy" data-local-copy="${g.id}">Salin ORI → EDIT</button>
       </div></td>
@@ -448,7 +450,10 @@ $("galleryTable").addEventListener("click",async event=>{
     const next=!g.isArchived;
     const verb=next?"mengarsipkan":"memulihkan";
     if(!confirm(`Yakin ${verb} galeri ${g.galleryName} milik ${g.clientName}? Data, foto, dan riwayat pilihan tidak dihapus.`))return;
-    const {error}=await sb.from("galleries").update({is_archived:next}).eq("id",g.id);
+    const {error}=await sb.from("galleries").update({
+      is_archived: next,
+      archived_at: next ? new Date().toISOString() : null
+    }).eq("id",g.id);
     if(error){alert("Gagal mengubah arsip: "+error.message+"\\nPastikan SQL manajemen galeri sudah dijalankan.");return;}
     g.isArchived=next;render();alert(next?"Galeri berhasil diarsipkan.":"Galeri berhasil dipulihkan.");return;
   }
@@ -457,11 +462,27 @@ $("galleryTable").addEventListener("click",async event=>{
     f.elements.driveUrl.value=g.driveUrl;f.elements.selectionLimit.value=g.limit;f.elements.durationDays.value=String(g.durationDays);
     f.elements.galleryStatus.value=g.galleryStatus;f.elements.packageType.value=g.packageType;
     $("formTitle").textContent="Edit Galeri Klien";$("saveGalleryBtn").textContent="Simpan Perubahan";$("cancelEdit").hidden=false;location.hash="#create";return;}
-  if(t.closest("[data-delete]")){const g=galleries.find(x=>x.id===t.closest("[data-delete]").dataset.delete);if(!g)return;
-    if(confirm(`Hapus galeri ${g.galleryName} milik ${g.clientName}?`)){
-      const {error}=await sb.from("galleries").delete().eq("id",g.id);
-      if(error)alert("Gagal menghapus: "+error.message);else{await loadGalleries();alert("Galeri dihapus dari database.");}
-    }return;}
+  if(t.closest("[data-purge]")){
+    const g=galleries.find(x=>x.id===t.closest("[data-purge]").dataset.purge);if(!g)return;
+    if(!g.isArchived){
+      alert("Arsipkan galeri terlebih dahulu sebelum menghapus permanen.");return;
+    }
+    const phrase = `HAPUS ${g.clientName}`;
+    const typed = prompt(`PERINGATAN: Penghapusan permanen tidak dapat dibatalkan.\n\nGaleri: ${g.galleryName}\nKlien: ${g.clientName}\n\nFoto asli di Google Drive tidak dihapus. Data galeri, draft, pilihan, dan riwayat terkait akan dihapus dari database.\n\nKetik persis: ${phrase}`);
+    if(typed !== phrase){ if(typed !== null) alert("Konfirmasi tidak cocok. Galeri tidak dihapus."); return; }
+    const button=t.closest("[data-purge]");button.disabled=true;
+    try{
+      const {data,error}=await sb.rpc("permanently_delete_archived_gallery",{p_gallery_id:g.id});
+      if(error)throw error;
+      if(!data?.ok)throw new Error(data?.message || "Penghapusan tidak berhasil.");
+      await loadGalleries();
+      alert("Galeri dan data database terkait berhasil dihapus permanen. File asli Google Drive tetap aman.");
+    }catch(err){
+      alert("Gagal menghapus permanen: "+(err.message||"Kesalahan tidak diketahui"));
+      button.disabled=false;
+    }
+    return;
+  }
   if(t.closest("[data-local-download]")){const g=galleries.find(x=>x.id===t.closest("[data-local-download]").dataset.localDownload);if(g)downloadChosenFromComputer(g);return;}
   if(t.closest("[data-local-copy]")){const g=galleries.find(x=>x.id===t.closest("[data-local-copy]").dataset.localCopy);if(g)copyChosenOriToEdit(g);return;}
 });
