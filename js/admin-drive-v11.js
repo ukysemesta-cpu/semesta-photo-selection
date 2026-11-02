@@ -15,6 +15,7 @@ if (missingAdminIds.length) {
   throw new Error("Admin HTML/JS mismatch: " + missingAdminIds.join(", "));
 }
 let galleries = [];
+let selectedPhotoCounts = {};
 let currentUser = null;
 
 function escapeHtml(value) {
@@ -43,7 +44,7 @@ function mapGallery(row) {
     status: row.selection_status === "submitted" ? "submitted" : row.gallery_status,
     galleryStatus: row.gallery_status, selectionStatus: row.selection_status,
     editingStatus: row.editing_status || "Belum mulai", packageType: row.package_type || "file_only",
-    submittedAt: row.submitted_at
+    submittedAt: row.submitted_at, revisionAllowed: row.revision_allowed === true
   };
 }
 function clientGalleryUrl(g) {
@@ -81,6 +82,9 @@ function render() {
   $("totalGalleries").textContent=galleries.length;
   $("pendingGalleries").textContent=galleries.filter(isPending).length;
   $("submittedGalleries").textContent=galleries.filter(isSubmitted).length;
+  $("activeGalleries").textContent=galleries.filter(g=>g.galleryStatus==="active").length;
+  $("revisionGalleries").textContent=galleries.filter(g=>g.revisionAllowed).length;
+  $("totalSelectedPhotos").textContent=Object.values(selectedPhotoCounts).reduce((sum,n)=>sum+n,0);
   const body=$("galleryTable");
   if(!galleries.length){body.innerHTML='<tr><td colspan="6" class="empty-cell">Belum ada galeri. Buat galeri pertama Anda di bawah.</td></tr>';return;}
   body.innerHTML=galleries.map(g=>{
@@ -116,7 +120,16 @@ async function loadGalleries(){
   $("galleryTable").innerHTML='<tr><td colspan="6" class="empty-cell">Memuat galeri dari Supabase...</td></tr>';
   const {data,error}=await sb.from("galleries").select("*").order("created_at",{ascending:false});
   if(error){console.error(error);alert("Gagal memuat galeri: "+error.message);return;}
-  galleries=(data||[]).map(mapGallery);render();
+  galleries=(data||[]).map(mapGallery);
+  const {data: selections, error: selectionError}=await sb.from("photo_selections").select("gallery_id");
+  if(selectionError){
+    console.warn("Tidak dapat memuat hitungan foto terpilih:",selectionError.message);
+    selectedPhotoCounts={};
+  }else{
+    selectedPhotoCounts={};
+    (selections||[]).forEach(row=>{selectedPhotoCounts[row.gallery_id]=(selectedPhotoCounts[row.gallery_id]||0)+1;});
+  }
+  render();
 }
 function resetForm(){
   $("galleryForm").reset();$("editingId").value="";$("formTitle").textContent="Buat Galeri Klien";
@@ -434,10 +447,10 @@ $("cancelEdit").addEventListener("click",resetForm);
 $("mobileMenu").addEventListener("click",()=>$("sidebar").classList.toggle("show"));
 document.querySelectorAll(".nav-link").forEach(link=>link.addEventListener("click",()=>$("sidebar").classList.remove("show")));
 function openDetails(filter){
-  const rows=galleries.filter(g=>filter==="all"||(filter==="pending"?isPending(g):isSubmitted(g)));
-  $("detailsTitle").textContent=filter==="all"?"Semua Galeri":filter==="pending"?"Menunggu Seleksi":"Sudah Submit";
+  const rows=galleries.filter(g=>filter==="all"||(filter==="pending"?isPending(g):filter==="submitted"?isSubmitted(g):filter==="active"?g.galleryStatus==="active":filter==="revision"?g.revisionAllowed:false));
+  $("detailsTitle").textContent=({all:"Semua Galeri",pending:"Menunggu Seleksi",submitted:"Sudah Submit",active:"Galeri Aktif",revision:"Akses Revisi Terbuka"})[filter]||"Galeri";
   $("detailsDescription").textContent=`${rows.length} galeri ditemukan.`;
-  $("detailsList").innerHTML=rows.map(g=>`<div class="detail-item"><div class="detail-item-main"><b>${escapeHtml(g.clientName)} — ${escapeHtml(g.galleryName)}</b><small>${isSubmitted(g)?"Sudah submit":g.galleryStatus==="active"?"Menunggu seleksi":"Draft"}</small></div><div class="detail-item-actions"><a class="mini-action" href="${escapeHtml(clientGalleryUrl(g))}" target="_blank">Preview</a></div></div>`).join("")||'<div class="details-empty">Belum ada galeri.</div>';
+  $("detailsList").innerHTML=rows.map(g=>`<div class="detail-item"><div class="detail-item-main"><b>${escapeHtml(g.clientName)} — ${escapeHtml(g.galleryName)}</b><small>${isSubmitted(g)?"Sudah submit":g.galleryStatus==="active"?"Menunggu seleksi":"Draft"} · ${(selectedPhotoCounts[g.id]||0)} foto dipilih${g.revisionAllowed?" · Akses revisi terbuka":""}</small></div><div class="detail-item-actions"><a class="mini-action" href="${escapeHtml(clientGalleryUrl(g))}" target="_blank">Preview</a></div></div>`).join("")||'<div class="details-empty">Belum ada galeri.</div>';
   $("detailsModal").classList.add("open");$("detailsModal").setAttribute("aria-hidden","false");
 }
 document.querySelectorAll("[data-stat]").forEach(card=>card.addEventListener("click",()=>openDetails(card.dataset.stat)));
