@@ -447,9 +447,9 @@ $("cancelEdit").addEventListener("click",resetForm);
 $("mobileMenu").addEventListener("click",()=>$("sidebar").classList.toggle("show"));
 document.querySelectorAll(".nav-link").forEach(link=>link.addEventListener("click",()=>$("sidebar").classList.remove("show")));
 function openDetails(filter){
-  const rows=galleries.filter(g=>filter==="all"||(filter==="pending"?isPending(g):filter==="submitted"?isSubmitted(g):filter==="active"?g.galleryStatus==="active":filter==="revision"?g.revisionAllowed:false));
-  $("detailsTitle").textContent=({all:"Semua Galeri",pending:"Menunggu Seleksi",submitted:"Sudah Submit",active:"Galeri Aktif",revision:"Akses Revisi Terbuka"})[filter]||"Galeri";
-  $("detailsDescription").textContent=`${rows.length} galeri ditemukan.`;
+  const rows=galleries.filter(g=>filter==="all"||(filter==="pending"?isPending(g):filter==="submitted"?isSubmitted(g):filter==="active"?g.galleryStatus==="active":filter==="revision"?g.revisionAllowed:filter==="selected"?(selectedPhotoCounts[g.id]||0)>0:false));
+  $("detailsTitle").textContent=({all:"Semua Galeri",pending:"Menunggu Seleksi",submitted:"Sudah Submit",active:"Galeri Aktif",revision:"Akses Revisi Terbuka",selected:"Galeri dengan Foto Terpilih"})[filter]||"Galeri";
+  $("detailsDescription").textContent=filter==="selected"?`${rows.length} galeri · ${rows.reduce((sum,g)=>sum+(selectedPhotoCounts[g.id]||0),0)} foto final dipilih.`:`${rows.length} galeri ditemukan.`;
   $("detailsList").innerHTML=rows.map(g=>`<div class="detail-item"><div class="detail-item-main"><b>${escapeHtml(g.clientName)} — ${escapeHtml(g.galleryName)}</b><small>${isSubmitted(g)?"Sudah submit":g.galleryStatus==="active"?"Menunggu seleksi":"Draft"} · ${(selectedPhotoCounts[g.id]||0)} foto dipilih${g.revisionAllowed?" · Akses revisi terbuka":""}</small></div><div class="detail-item-actions"><a class="mini-action" href="${escapeHtml(clientGalleryUrl(g))}" target="_blank">Preview</a></div></div>`).join("")||'<div class="details-empty">Belum ada galeri.</div>';
   $("detailsModal").classList.add("open");$("detailsModal").setAttribute("aria-hidden","false");
 }
