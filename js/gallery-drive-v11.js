@@ -2,7 +2,7 @@ const cfg=window.SEMESTA_SUPABASE_CONFIG;
 const sb=window.supabase.createClient(cfg.url,cfg.publishableKey);
 const params=new URLSearchParams(location.search),token=params.get("token");
 const $=id=>document.getElementById(id);
-let gallery=null,photos=[],currentIndex=0,showingSelected=false,showingHighlight=false,searchTerm="",sortMode="original";
+let gallery=null,photos=[],currentIndex=0,showingSelected=false,showingHighlight=false,searchTerm="",sortMode="original",swipeMode=false;
 if(!token){$("galleryNotice").textContent="Link galeri tidak lengkap. Silakan minta link terbaru dari admin.";throw new Error("Missing gallery token");}
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function selectedCount(){return photos.filter(p=>p.selected).length;}
@@ -67,9 +67,26 @@ function openPreview(id){
  previewImage.dataset.fallback="";
  previewImage.src=p.preview_url||"";$("previewName").textContent=p.filename;
  $("previewSelect").textContent=p.selected?"♥ Foto Terpilih":"♡ Pilih Foto";
+ $("previewSelect").disabled=gallery.selection_status==="submitted";
+ $("previewSkip").textContent=swipeMode?"Lewati →":"Tutup foto";
+ $("swipeHint").textContent=swipeMode?"Mode Swipe aktif · Geser kiri untuk melewati, kanan untuk memilih":"Gunakan tombol atau geser foto";
  $("previewModal").classList.add("open");
 }
-function closePreview(){$("previewModal").classList.remove("open");}
+function startSwipeMode(){
+ if(!photos.length)return;
+ swipeMode=true;
+ const candidates=photos.filter(p=>!p.selected);
+ const first=candidates[0]||photos[0];
+ openPreview(first.id);
+}
+function stopSwipeMode(){swipeMode=false;closePreview();}
+function advanceSwipe(){
+ const remaining=photos.filter(p=>!p.selected);
+ if(!remaining.length){alert("Semua foto sudah dipilih. Anda dapat meninjau pilihan melalui tombol Lihat Pilihan.");stopSwipeMode();return;}
+ const next=remaining.find(p=>photos.indexOf(p)>currentIndex)||remaining[0];
+ openPreview(next.id);
+}
+function closePreview(){$("previewModal").classList.remove("open");swipeMode=false;}
 async function togglePhoto(id){
  if(gallery.selection_status==="submitted"){alert("Pilihan sudah dikirim. Hubungi admin jika perlu perubahan.");return;}
  if(gallery.selection_deadline && new Date().toISOString().slice(0,10)>gallery.selection_deadline){alert("Batas waktu pemilihan telah berakhir.");return;}
@@ -105,9 +122,21 @@ $("selectedFilter").addEventListener("click",()=>{showingSelected=true;showingHi
 $("highlightFilter").addEventListener("click",()=>{showingHighlight=true;showingSelected=false;$("highlightFilter").classList.add("active");$("allFilter").classList.remove("active");$("selectedFilter").classList.remove("active");render();});
 $("photoSearch").addEventListener("input",e=>{searchTerm=e.target.value.trim();render();});
 $("photoSort").addEventListener("change",e=>{sortMode=e.target.value;render();});
+$("startSwipeMode").addEventListener("click",startSwipeMode);
+$("previewSkip").addEventListener("click",()=>{if(swipeMode)advanceSwipe();else closePreview();});
+let swipeStartX=0,swipeStartY=0;
+$("previewArt").addEventListener("touchstart",e=>{const t=e.changedTouches[0];swipeStartX=t.clientX;swipeStartY=t.clientY;},{passive:true});
+$("previewArt").addEventListener("touchend",async e=>{
+ if(!swipeMode)return;
+ const t=e.changedTouches[0],dx=t.clientX-swipeStartX,dy=t.clientY-swipeStartY;
+ if(Math.abs(dx)<65||Math.abs(dx)<Math.abs(dy))return;
+ const current=photos[currentIndex];
+ if(dx>0){if(current&&!current.selected)togglePhoto(current.id);advanceSwipe();}
+ else{advanceSwipe();}
+},{passive:true});
 $("closePreview").addEventListener("click",closePreview);
 $("previewModal").addEventListener("click",e=>{if(e.target===$("previewModal"))closePreview();});
-$("previewSelect").addEventListener("click",async()=>{const p=photos[currentIndex];if(!p)return;await togglePhoto(p.id);openPreview(p.id);});
+$("previewSelect").addEventListener("click",async()=>{const p=photos[currentIndex];if(!p)return;if(swipeMode){if(!p.selected)togglePhoto(p.id);advanceSwipe();}else{togglePhoto(p.id);openPreview(p.id);}});
 $("prevPhoto").addEventListener("click",()=>{if(!photos.length)return;currentIndex=(currentIndex-1+photos.length)%photos.length;openPreview(photos[currentIndex].id);});
 $("nextPhoto").addEventListener("click",()=>{if(!photos.length)return;currentIndex=(currentIndex+1)%photos.length;openPreview(photos[currentIndex].id);});
 $("submitSelection").addEventListener("click",async()=>{
