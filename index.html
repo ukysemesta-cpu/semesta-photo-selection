@@ -37,6 +37,10 @@
 .gallery-view-meta span[aria-hidden="true"]{font-size:12px;margin-right:3px}
 .gallery-view-last{color:#94a3b8}
 </style>
+<style>
+.dashboard-subtitle{margin:5px 0 0;color:#d4e5dc;font-size:12px;font-weight:400;line-height:1.4;letter-spacing:.1px}
+@media(max-width:640px){.dashboard-subtitle{font-size:10px;margin-top:3px}}
+</style>
 </head>
 <body>
 <div class="app-shell">
@@ -53,7 +57,7 @@
     <div class="sidebar-bottom"><div class="sidebar-note"><span class="status-dot"></span><span>Mode pengembangan<br><b>Data masih lokal</b></span></div><small>SEMESTA GROUP · 2026</small></div>
   </aside>
   <main class="main-area">
-    <header class="topbar"><button class="mobile-menu" id="mobileMenu" aria-label="Buka menu">☰</button><div><span class="eyebrow">ADMINISTRATOR</span><h1>Dashboard</h1></div><div class="topbar-right">
+    <header class="topbar"><button class="mobile-menu" id="mobileMenu" aria-label="Buka menu">☰</button><div><span class="eyebrow">ADMINISTRATOR</span><h1>Dashboard</h1><p class="dashboard-subtitle">Aplikasi memilih foto buatan tim Semesta</p></div><div class="topbar-right">
         <span class="avatar">SA</span><span class="admin-label" id="signedInEmail">Semesta Admin</span>
         <button class="mini-action" id="logoutButton" type="button">Keluar</button>
       </div></header>
@@ -147,5 +151,5 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-config.js"></script>
-<script src="js/admin-drive-v11.js?v=20261102-gallery-view-tracker-v1"></script>
+<script src="js/admin-drive-v11.js?v=20261102-gallery-view-tracker-subtitle-v1"></script>
 </body></html>
