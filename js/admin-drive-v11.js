@@ -393,9 +393,18 @@ $("managedPhotoList")?.addEventListener("click", event => {
 });
 
 async function getSelections(g){
-  const {data,error}=await sb.from("photo_selections").select("photo_id,photos(filename)").eq("gallery_id",g.id);
+  const {data,error}=await sb.from("photo_selections")
+    .select("photo_id,photos(id,filename,drive_file_id,download_url,preview_url)")
+    .eq("gallery_id",g.id);
   if(error){alert("Gagal mengambil rekap pilihan: "+error.message);return [];}
   return (data||[]).map(x=>x.photos?.filename||x.photo_id);
+}
+async function getSelectedPhotoRecords(g){
+  const {data,error}=await sb.from("photo_selections")
+    .select("photo_id,photos(id,filename,drive_file_id,download_url,preview_url)")
+    .eq("gallery_id",g.id);
+  if(error) throw new Error("Gagal mengambil foto pilihan: "+error.message);
+  return (data||[]).map(x=>x.photos).filter(Boolean);
 }
 function safeName(s){return String(s||"galeri").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
 function downloadBlob(content,name,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -405,151 +414,77 @@ async function exportRecap(g){
   downloadBlob(JSON.stringify(out,null,2),`${safeName(g.galleryName)}-rekap.json`,"application/json");
 }
 
-// Local folder helpers retained; online selected filenames are read from Supabase.
+// Client-selected photos are downloaded directly from their Google Drive file IDs.
+// No local folder picker or folder-structure assumptions are needed.
 const RAW_EXTENSIONS=new Set(["cr2","cr3","nef","arw","raf","dng","orf","rw2","pef","srw"]);
-function filenameBase(filename){return String(filename).replace(/\.[^.]+$/,"").toLowerCase();}
-function fileExtension(filename){return String(filename).match(/\.([^.]+)$/)?.[1].toLowerCase()||"";}
-async function chosenNames(g){
-  const names=await getSelections(g);return names;
+function fileExtension(filename){return String(filename||"").match(/\.([^.]+)$/)?.[1].toLowerCase()||"";}
+async function chosenPhotoRecords(g){
+  const rows=await getSelectedPhotoRecords(g);
+  return rows.filter(row=>row && (row.drive_file_id || row.download_url));
 }
-async function choosePhotoFormat(){const v=prompt("Pilih format:\n1 = JPG/JPEG\n2 = RAW\n3 = JPG + RAW","1");return v==="1"?"jpg":v==="2"?"raw":v==="3"?"both":null;}
-function collectMatchingLocalFiles(fileList, chosen, format, onlyOri=false) {
-  const wanted = new Set(chosen.map(filenameBase));
-  return Array.from(fileList || []).filter(file => {
-    const rel = String(file.webkitRelativePath || file.name).replace(/\\/g, "/");
-    const parts = rel.split("/");
-    const inOri = parts.some(part => part.toLocaleUpperCase("id") === "ORI");
-    const ext = fileExtension(file.name);
-    const jpg = ["jpg", "jpeg"].includes(ext);
-    const raw = RAW_EXTENSIONS.has(ext);
-    if (onlyOri && !inOri) return false;
-    if (!onlyOri && format === "jpg" && !jpg) return false;
-    if (!onlyOri && format === "raw" && !raw) return false;
-    if (!onlyOri && format === "both" && !jpg && !raw) return false;
-    return wanted.has(filenameBase(file.name));
-  });
+async function choosePhotoFormat(){
+  const v=prompt("Pilih format:\n1 = JPG/JPEG\n2 = RAW\n3 = JPG + RAW","1");
+  return v==="1"?"jpg":v==="2"?"raw":v==="3"?"both":null;
 }
-function downloadLocalFiles(files) {
-  files.forEach((file, index) => {
-    const url = URL.createObjectURL(file);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    // Small spacing helps browsers process multiple downloads.
-    setTimeout(() => {
+function driveDownloadUrl(photo){
+  if(photo.drive_file_id){
+    return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(photo.drive_file_id)}`;
+  }
+  return photo.download_url || null;
+}
+function startDriveDownloads(photos, label){
+  if(!photos.length){
+    alert("Tidak ada file pilihan yang memiliki ID/link download Google Drive. Periksa hasil sinkronisasi foto galeri.");
+    return;
+  }
+  // Trigger separate browser downloads. Chrome/Edge may ask permission for multiple files.
+  photos.forEach((photo,index)=>{
+    const url=driveDownloadUrl(photo);
+    if(!url)return;
+    setTimeout(()=>{
+      const a=document.createElement("a");
+      a.href=url;
+      a.target="_blank";
+      a.rel="noopener";
+      a.download=photo.filename || "";
+      document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    }, index * 180);
+    },index*350);
   });
-}
-function pickLocalFolderFallback({onlyOri=false, format="both"}={}) {
-  return new Promise(resolve => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.setAttribute("webkitdirectory", "");
-    input.setAttribute("directory", "");
-    input.multiple = true;
-    input.accept = "*/*";
-    input.style.display = "none";
-    document.body.appendChild(input);
-    input.addEventListener("change", () => {
-      const files = Array.from(input.files || []);
-      input.remove();
-      resolve(collectMatchingLocalFiles(files, window.__semestaFolderChosen || [], format, onlyOri));
-    }, { once: true });
-    input.addEventListener("cancel", () => { input.remove(); resolve(null); }, { once: true });
-    input.click();
-  });
-}
-async function walkDirectoryFiles(dir, prefix="") {
-  const found = [];
-  for await (const entry of dir.values()) {
-    if (entry.kind === "file") {
-      found.push({file: await entry.getFile(), relativePath: `${prefix}${entry.name}`});
-    } else if (entry.kind === "directory") {
-      const child = await dir.getDirectoryHandle(entry.name);
-      found.push(...await walkDirectoryFiles(child, `${prefix}${entry.name}/`));
-    }
-  }
-  return found;
+  alert(`${photos.length} file ${label} sedang dikirim ke browser untuk diunduh dari Google Drive. Jika Chrome/Edge meminta izin beberapa download, pilih Izinkan. File akan masuk ke folder Downloads.`);
 }
 async function downloadChosenFromComputer(g){
-  const chosen=await chosenNames(g);
-  if(!chosen.length){alert("Belum ada pilihan foto yang tersimpan.");return;}
-  const format=await choosePhotoFormat();if(!format)return;
-
-  if (window.isSecureContext !== true) {
-    alert("Browser belum berada pada Secure Context. Buka aplikasi melalui HTTPS atau localhost, bukan HTTP.");
-    return;
-  }
-
-  try {
-    if (typeof window.showDirectoryPicker === "function") {
-      const dir = await window.showDirectoryPicker({mode:"read"});
-      const files = await walkDirectoryFiles(dir);
-      const wanted = new Set(chosen.map(filenameBase));
-      const matched = files
-        .filter(item => {
-          const ext=fileExtension(item.file.name),jpg=["jpg","jpeg"].includes(ext),raw=RAW_EXTENSIONS.has(ext);
-          return wanted.has(filenameBase(item.file.name)) &&
-            (format==="jpg"?jpg:format==="raw"?raw:(jpg||raw));
-        })
-        .map(item=>item.file);
-      if(!matched.length){alert("Tidak ditemukan file yang cocok. Pilih folder induk yang berisi subfolder EDIT dan ORI.");return;}
-      downloadLocalFiles(matched);
-      alert(`${matched.length} file cocok. Download sedang diproses.`);
+  try{
+    const chosen=await getSelectedPhotoRecords(g);
+    if(!chosen.length){alert("Belum ada pilihan foto yang tersimpan.");return;}
+    const format=await choosePhotoFormat();if(!format)return;
+    const filtered=chosen.filter(photo=>{
+      const ext=fileExtension(photo.filename);
+      const jpg=["jpg","jpeg"].includes(ext);
+      const raw=RAW_EXTENSIONS.has(ext);
+      return (format==="jpg"&&jpg)||(format==="raw"&&raw)||(format==="both"&&(jpg||raw));
+    });
+    if(!filtered.length){
+      alert("Tidak ada foto pilihan dengan format tersebut. Periksa ekstensi nama file foto yang tersimpan di galeri.");
       return;
     }
-
-    // Fallback for browsers without the File System Access API.
-    window.__semestaFolderChosen = chosen;
-    const files = await pickLocalFolderFallback({format});
-    window.__semestaFolderChosen = [];
-    if(files === null) return;
-    if(!files.length){alert("Tidak ditemukan file JPG/RAW yang cocok. Pilih folder induk yang berisi subfolder EDIT dan ORI.");return;}
-    downloadLocalFiles(files);
-    alert(`${files.length} file cocok. Download sedang diproses.`);
-  } catch(e) {
-    if(e.name!=="AbortError") alert("Gagal membaca folder: "+(e.message||e));
-  }
+    startDriveDownloads(filtered,"pilihan klien");
+  }catch(e){alert("Gagal menyiapkan download: "+(e.message||e));}
 }
 async function copyChosenOriToEdit(g){
-  const chosen=await chosenNames(g);
-  if(!chosen.length){alert("Belum ada pilihan foto.");return;}
-  if (window.isSecureContext !== true) {
-    alert("Browser belum berada pada Secure Context. Buka aplikasi melalui HTTPS atau localhost, bukan HTTP.");
-    return;
-  }
-
-  if (typeof window.showDirectoryPicker !== "function") {
-    // Browsers without directory-write support cannot copy directly into a local folder.
-    window.__semestaFolderChosen = chosen;
-    const files = await pickLocalFolderFallback({onlyOri:true});
-    window.__semestaFolderChosen = [];
-    if(files === null) return;
-    if(!files.length){alert("Tidak ditemukan file pilihan di subfolder ORI. Pilih folder induk yang berisi folder ORI dan EDIT.");return;}
-    downloadLocalFiles(files);
-    alert(`${files.length} file ORI berhasil disiapkan untuk diunduh. Karena browser ini tidak mendukung penulisan folder lokal, pindahkan hasil download ke folder EDIT secara manual.`);
-    return;
-  }
-
   try{
-    const parent=await window.showDirectoryPicker({mode:"readwrite"});
-    const ori=await parent.getDirectoryHandle("ORI");
-    const edit=await parent.getDirectoryHandle("EDIT",{create:true});
-    const wanted=new Set(chosen.map(filenameBase));let count=0;
-    for await(const entry of ori.values()){
-      if(entry.kind!=="file"||!wanted.has(filenameBase(entry.name)))continue;
-      const file=await entry.getFile();
-      const target=await edit.getFileHandle(entry.name,{create:true});
-      const w=await target.createWritable();await w.write(file);await w.close();count++;
+    const chosen=await getSelectedPhotoRecords(g);
+    if(!chosen.length){alert("Belum ada pilihan foto yang tersimpan.");return;}
+    // This action now downloads the selected original Drive files to Downloads.
+    // Admin can move them manually into the local EDIT folder, regardless of Drive folder layout.
+    const available=chosen.filter(photo=>photo.drive_file_id||photo.download_url);
+    if(!available.length){
+      alert("Foto pilihan belum memiliki ID file Google Drive. Jalankan Sinkronisasi Google Drive terlebih dahulu.");
+      return;
     }
-    alert(`${count} file berhasil disalin dari ORI ke EDIT.`);
-  }catch(e){
-    if(e.name!=="AbortError")alert("Gagal menyalin: "+(e.message||e)+"\\nPastikan folder yang dipilih berisi subfolder ORI dan EDIT.");
-  }
+    startDriveDownloads(available,"ORI pilihan klien");
+  }catch(e){alert("Gagal menyiapkan file ORI: "+(e.message||e));}
 }
 
 $("galleryTable").addEventListener("click",async event=>{
