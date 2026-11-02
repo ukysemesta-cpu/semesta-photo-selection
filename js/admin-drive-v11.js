@@ -32,6 +32,12 @@ function prettyDate(value) {
   if (parts.length !== 3 || parts.some(Number.isNaN)) return "—";
   return new Date(parts[0],parts[1]-1,parts[2]).toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
 }
+function prettyDateTime(value) {
+  if (!value) return "Belum pernah dilihat";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Belum pernah dilihat";
+  return date.toLocaleString("id-ID", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
 function addDays(dateValue, days) {
   const d = new Date(dateValue); d.setDate(d.getDate()+Number(days));
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -49,7 +55,8 @@ function mapGallery(row) {
     status: row.selection_status === "submitted" ? "submitted" : row.gallery_status,
     galleryStatus: row.gallery_status, selectionStatus: row.selection_status,
     editingStatus: row.editing_status || "Belum mulai", packageType: row.package_type || "file_only",
-    submittedAt: row.submitted_at, revisionAllowed: row.revision_allowed === true, isArchived: row.is_archived === true, archivedAt: row.archived_at || null
+    submittedAt: row.submitted_at, revisionAllowed: row.revision_allowed === true, isArchived: row.is_archived === true, archivedAt: row.archived_at || null,
+    viewCount: Number(row.view_count || 0), lastViewedAt: row.last_viewed_at || null
   };
 }
 function clientGalleryUrl(g) {
@@ -106,7 +113,13 @@ function render() {
   body.innerHTML=rows.map(g=>{
     const statusText=isSubmitted(g)?"Sudah Submit":g.galleryStatus==="active"?"Menunggu Seleksi":"Draft";
     return `<tr>
-      <td><b>${escapeHtml(g.clientName)}</b></td>
+      <td>
+        <b>${escapeHtml(g.clientName)}</b>
+        <small class="gallery-view-meta" title="Jumlah kunjungan halaman galeri klien">
+          <span aria-hidden="true">◉</span> ${g.viewCount ? `${g.viewCount} kali dilihat` : "Belum dilihat"}
+          <br><span class="gallery-view-last">${escapeHtml(prettyDateTime(g.lastViewedAt))}</span>
+        </small>
+      </td>
       <td>${escapeHtml(g.galleryName)}</td>
       <td>${g.limit==="0"?"Tanpa batas":`${escapeHtml(g.limit)} foto`}</td>
       <td>${prettyDate(g.deadline)} <small>(${g.durationDays} hari)</small></td>
