@@ -2,13 +2,18 @@ const cfg=window.SEMESTA_SUPABASE_CONFIG;
 const sb=window.supabase.createClient(cfg.url,cfg.publishableKey);
 const params=new URLSearchParams(location.search),token=params.get("token");
 const $=id=>document.getElementById(id);
-let gallery=null,photos=[],currentIndex=0,showingSelected=false;
+let gallery=null,photos=[],currentIndex=0,showingSelected=false,showingHighlight=false,searchTerm="",sortMode="original";
 if(!token){$("galleryNotice").textContent="Link galeri tidak lengkap. Silakan minta link terbaru dari admin.";throw new Error("Missing gallery token");}
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function selectedCount(){return photos.filter(p=>p.selected).length;}
 function render(){
- const visible=photos.filter(p=>!showingSelected||p.selected);
- $("photoCount").textContent=`${visible.length} foto ditampilkan`;
+ let visible=photos.filter(p=>(!showingSelected||p.selected)&&(!showingHighlight||p.is_highlight));
+ if(searchTerm){const term=searchTerm.toLocaleLowerCase("id");visible=visible.filter(p=>String(p.filename||"").toLocaleLowerCase("id").includes(term));}
+ if(sortMode==="az")visible.sort((a,b)=>String(a.filename).localeCompare(String(b.filename),"id",{numeric:true,sensitivity:"base"}));
+ else if(sortMode==="za")visible.sort((a,b)=>String(b.filename).localeCompare(String(a.filename),"id",{numeric:true,sensitivity:"base"}));
+ else if(sortMode==="selected")visible.sort((a,b)=>Number(!!b.selected)-Number(!!a.selected)||(Number(a.sort_order)||0)-(Number(b.sort_order)||0));
+ $("photoCount").textContent=`${visible.length} dari ${photos.length} foto ditampilkan`;
+ $("highlightFilter").hidden=!photos.some(p=>p.is_highlight);
  $("photoGrid").innerHTML=visible.map(p=>`<article class="photo-card ${p.selected?"selected":""}" data-id="${p.id}">
    <img src="${escapeHtml(p.preview_url||"")}" data-drive-id="${escapeHtml(p.drive_file_id||"")}" alt="${escapeHtml(p.filename)}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="if(this.dataset.driveId && !this.dataset.fallback){this.dataset.fallback='1';this.src='https://drive.google.com/uc?export=view&id='+encodeURIComponent(this.dataset.driveId)}else{this.style.opacity='0.15'}">
    <span class="photo-name">${escapeHtml(p.filename)}</span>
@@ -43,8 +48,11 @@ $("photoGrid").addEventListener("click",e=>{
  const b=e.target.closest("[data-select]");if(b){e.stopPropagation();togglePhoto(b.dataset.select);return;}
  const card=e.target.closest("[data-id]");if(card)openPreview(card.dataset.id);
 });
-$("allFilter").addEventListener("click",()=>{showingSelected=false;$("allFilter").classList.add("active");$("selectedFilter").classList.remove("active");render();});
-$("selectedFilter").addEventListener("click",()=>{showingSelected=true;$("selectedFilter").classList.add("active");$("allFilter").classList.remove("active");render();});
+$("allFilter").addEventListener("click",()=>{showingSelected=false;showingHighlight=false;$("allFilter").classList.add("active");$("selectedFilter").classList.remove("active");$("highlightFilter").classList.remove("active");render();});
+$("selectedFilter").addEventListener("click",()=>{showingSelected=true;showingHighlight=false;$("selectedFilter").classList.add("active");$("allFilter").classList.remove("active");$("highlightFilter").classList.remove("active");render();});
+$("highlightFilter").addEventListener("click",()=>{showingHighlight=true;showingSelected=false;$("highlightFilter").classList.add("active");$("allFilter").classList.remove("active");$("selectedFilter").classList.remove("active");render();});
+$("photoSearch").addEventListener("input",e=>{searchTerm=e.target.value.trim();render();});
+$("photoSort").addEventListener("change",e=>{sortMode=e.target.value;render();});
 $("closePreview").addEventListener("click",closePreview);
 $("previewModal").addEventListener("click",e=>{if(e.target===$("previewModal"))closePreview();});
 $("previewSelect").addEventListener("click",async()=>{const p=photos[currentIndex];if(!p)return;await togglePhoto(p.id);openPreview(p.id);});
