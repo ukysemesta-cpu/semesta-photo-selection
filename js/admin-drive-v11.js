@@ -142,7 +142,7 @@ async function loadManagedPhotos(g) {
   const list = $("managedPhotoList");
   list.innerHTML = '<div class="details-empty">Memuat daftar foto...</div>';
   const { data, error } = await sb.from("photos")
-    .select("id,filename,preview_url,sort_order,created_at")
+    .select("id,filename,preview_url,sort_order,created_at,is_highlight")
     .eq("gallery_id", g.id)
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
@@ -155,12 +155,44 @@ async function loadManagedPhotos(g) {
     list.innerHTML = '<div class="details-empty">Belum ada foto tersinkron. Pastikan link folder Google Drive sudah diisi, lalu klik Sinkronkan.</div>';
     return;
   }
-  list.innerHTML = data.map((p, i) => `
+  const highlighted = data.filter(p => p.is_highlight).length;
+  list.innerHTML = `
+    <div class="highlight-admin-summary">
+      <b>★ ${highlighted} foto Highlight</b>
+      <small>Pilih foto rekomendasi yang ingin ditampilkan pada filter Highlight di galeri klien.</small>
+    </div>
+    ${data.map((p, i) => `
     <div class="photo-item">
       <img src="${escapeHtml(p.preview_url || "")}" alt="${escapeHtml(p.filename)}" loading="lazy" style="width:76px;height:76px;object-fit:cover;border-radius:8px;background:#eef2f7" onerror="this.style.display='none'">
-      <div><b>${i + 1}. ${escapeHtml(p.filename)}</b><small>Preview dari Google Drive</small></div>
-      <span class="pill pill-green">Tersimpan</span>
-    </div>`).join("");
+      <div class="photo-item-info"><b>${i + 1}. ${escapeHtml(p.filename)}</b><small>${p.is_highlight ? "★ Direkomendasikan untuk klien" : "Preview dari Google Drive"}</small></div>
+      <button type="button" class="btn ${p.is_highlight ? "btn-primary" : "btn-secondary"} highlight-toggle" data-highlight-photo="${p.id}" data-highlight-state="${p.is_highlight ? "1" : "0"}" aria-pressed="${p.is_highlight ? "true" : "false"}">${p.is_highlight ? "★ Highlight" : "☆ Jadikan Highlight"}</button>
+    </div>`).join("")}`;
+}
+
+async function togglePhotoHighlight(photoId, currentlyHighlighted) {
+  if (!activePhotoGallery) return;
+  const buttons = [...$("managedPhotoList").querySelectorAll("[data-highlight-photo]")];
+  buttons.forEach(button => button.disabled = true);
+  try {
+    const { data, error } = await sb.from("photos")
+      .update({ is_highlight: !currentlyHighlighted })
+      .eq("id", photoId)
+      .eq("gallery_id", activePhotoGallery.id)
+      .select("id,is_highlight")
+      .single();
+    if (error) throw error;
+    if (!data) throw new Error("Perubahan tidak tersimpan. Periksa hak akses admin pada tabel photos.");
+    $("photoUploadStatus").textContent = data.is_highlight
+      ? "Foto berhasil ditandai sebagai Highlight."
+      : "Tanda Highlight berhasil dihapus.";
+    await loadManagedPhotos(activePhotoGallery);
+  } catch (err) {
+    console.error("Update photo highlight failed:", err);
+    $("photoUploadStatus").textContent = "Gagal mengubah Highlight.";
+    alert("Tidak dapat mengubah Highlight: " + (err.message || "Periksa izin akses tabel photos."));
+  } finally {
+    buttons.forEach(button => button.disabled = false);
+  }
 }
 
 async function managePhotos(g) {
@@ -216,6 +248,12 @@ $("photoManagerModal")?.addEventListener("click", e => {
 });
 $("syncDriveButton")?.addEventListener("click", () => {
   if (activePhotoGallery) syncDrivePhotos(activePhotoGallery, false);
+});
+
+$("managedPhotoList")?.addEventListener("click", event => {
+  const button = event.target.closest("[data-highlight-photo]");
+  if (!button || !activePhotoGallery) return;
+  togglePhotoHighlight(button.dataset.highlightPhoto, button.dataset.highlightState === "1");
 });
 
 async function getSelections(g){
