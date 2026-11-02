@@ -25,7 +25,12 @@
   <main class="client-main">
     <div class="client-intro"><span class="eyebrow">YOUR PHOTO GALLERY</span><h1 id="clientGalleryTitle">Galeri Foto Anda</h1><p id="clientGreeting">Silakan pilih foto yang ingin diproses untuk editing.</p></div>
     <div class="selection-summary"><div><span class="muted">Foto terpilih</span><strong><span id="selectedCount">0</span><small id="selectionLimit"> / 20 foto</small></strong></div><div class="progress-track"><div id="progressBar"></div></div><button class="btn btn-primary" id="submitSelection">Kirim Pilihan Foto</button></div>
-    <div class="gallery-toolbar"><div><b>Preview Foto</b><small id="photoCount">Contoh tampilan galeri</small></div><button class="filter-btn active" id="allFilter">Semua Foto</button><button class="filter-btn" id="selectedFilter">♥ Terpilih</button></div>
+    <div class="gallery-tools">
+      <div class="gallery-tools-top"><div><b>Preview Foto</b><small id="photoCount">Memuat foto...</small></div>
+        <div class="gallery-filters"><button class="filter-btn active" id="allFilter" type="button">Semua Foto</button><button class="filter-btn" id="highlightFilter" type="button" hidden>★ Highlight</button><button class="filter-btn" id="selectedFilter" type="button">♥ Terpilih</button></div>
+      </div>
+      <div class="gallery-controls"><label class="gallery-search"><span>⌕</span><input id="photoSearch" type="search" placeholder="Cari nama foto..." autocomplete="off"></label><label class="gallery-sort"><span>Urutkan:</span><select id="photoSort"><option value="original">Urutan asli</option><option value="az">Nama A–Z</option><option value="za">Nama Z–A</option><option value="selected">Terpilih dahulu</option></select></label></div>
+    </div>
     <div class="photo-grid" id="photoGrid"></div>
     <p class="demo-warning" id="galleryNotice">Galeri foto Semesta.</p>
   </main>
@@ -39,6 +44,6 @@ if (pageToken) document.getElementById("progressLink").href = `progress.html?tok
     helpBtn.addEventListener("click", () => helpDropdown.classList.toggle("show"));
     document.addEventListener("click", e => { if (!e.target.closest(".help-menu")) helpDropdown.classList.remove("show"); });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/gallery-drive-v11.js?v=20261102-1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/gallery-drive-v11.js?v=20261102-search-sort-1"></script>
 </body>
 </html>
