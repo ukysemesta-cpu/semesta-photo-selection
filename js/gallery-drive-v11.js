@@ -97,7 +97,13 @@ function render(){
  $("selectedCount").textContent=count;
  $("reviewCount").textContent=count;
  $("selectionLimit").textContent=limit===0?" / tanpa batas":` / ${limit} foto`;
- $("progressBar").style.width=(limit===0?Math.min(count*5,100):Math.min(count/Math.max(limit,1)*100,100))+"%";
+ const remaining=limit===0?null:Math.max(0,limit-count);
+ $("selectionExtra").textContent=limit===0
+   ?`Total ${photos.length} foto tersedia · Kuota tanpa batas`
+   :`Total ${photos.length} foto tersedia · Sisa kuota ${remaining} foto`;
+ const progressPercent=limit===0?Math.min(count*5,100):Math.min(count/Math.max(limit,1)*100,100);
+ $("progressBar").style.width=progressPercent+"%";
+ $("progressBar").parentElement.setAttribute("aria-valuenow",String(Math.round(progressPercent)));
  const locked=gallery.selection_status==="submitted" && !gallery.revision_allowed;
  $("submitSelection").disabled=locked;
  $("submitSelection").textContent=locked?"Pilihan Sudah Dikirim":(gallery.selection_status==="submitted"&&gallery.revision_allowed?"Kirim Revisi Foto":"Kirim Pilihan Foto");
