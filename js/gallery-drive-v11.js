@@ -5,6 +5,40 @@ const $=id=>document.getElementById(id);
 let gallery=null,photos=[],currentIndex=0,showingSelected=false,showingHighlight=false,searchTerm="",sortMode="original",swipeMode=false,draftSaveTimer=null,draftSaving=false,draftDirty=false,draftSaveQueue=Promise.resolve(),lastDraftIds="";
 if(!token){$("galleryNotice").textContent="Link galeri tidak lengkap. Silakan minta link terbaru dari admin.";throw new Error("Missing gallery token");}
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+function markImageLoaded(img){
+ const host=img.closest(".photo-card, .review-photo");
+ img.dataset.imageState="loaded";
+ host?.classList.remove("image-loading","image-failed");
+}
+function handleGalleryImageError(img){
+ if(img.dataset.fallback!=="1" && img.dataset.driveId){
+  img.dataset.fallback="1";
+  img.dataset.imageState="fallback";
+  img.src=`https://drive.google.com/uc?export=view&id=${encodeURIComponent(img.dataset.driveId)}`;
+  return;
+ }
+ const host=img.closest(".photo-card, .review-photo");
+ img.dataset.imageState="failed";
+ host?.classList.remove("image-loading");
+ host?.classList.add("image-failed");
+ img.alt="Preview foto tidak tersedia";
+}
+function bindImageLifecycle(container){
+ if(!container || container.dataset.imageLifecycle==="1")return;
+ container.dataset.imageLifecycle="1";
+ container.addEventListener("load",event=>{
+  const img=event.target;
+  if(img instanceof HTMLImageElement && img.matches(".photo-thumb, .review-thumb"))markImageLoaded(img);
+ },true);
+ container.addEventListener("error",event=>{
+  const img=event.target;
+  if(img instanceof HTMLImageElement && img.matches(".photo-thumb, .review-thumb"))handleGalleryImageError(img);
+ },true);
+}
+
+bindImageLifecycle($('photoGrid'));
+bindImageLifecycle($('reviewList'));
 function currentDraftIds(){
  return photos.filter(p=>p.selected).map(p=>p.id).sort();
 }
@@ -88,8 +122,8 @@ function render(){
  else if(sortMode==="selected")visible.sort((a,b)=>Number(!!b.selected)-Number(!!a.selected)||(Number(a.sort_order)||0)-(Number(b.sort_order)||0));
  $("photoCount").textContent=`${visible.length} dari ${photos.length} foto ditampilkan`;
  $("highlightFilter").hidden=!photos.some(p=>p.is_highlight);
- $("photoGrid").innerHTML=visible.map(p=>`<article class="photo-card ${p.selected?"selected":""}" data-id="${p.id}">
-   <img src="${escapeHtml(p.preview_url||"")}" data-drive-id="${escapeHtml(p.drive_file_id||"")}" alt="${escapeHtml(p.filename)}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="if(this.dataset.driveId && !this.dataset.fallback){this.dataset.fallback='1';this.src='https://drive.google.com/uc?export=view&id='+encodeURIComponent(this.dataset.driveId)}else{this.style.opacity='0.15'}">
+ $("photoGrid").innerHTML=visible.map(p=>`<article class="photo-card image-loading ${p.selected?"selected":""}" data-id="${p.id}">
+   <img class="photo-thumb" src="${escapeHtml(p.preview_url||(p.drive_file_id?`https://drive.google.com/uc?export=view&id=${encodeURIComponent(p.drive_file_id)}`:""))}" data-drive-id="${escapeHtml(p.drive_file_id||"")}" data-fallback="${p.preview_url?"0":"1"}" data-image-state="loading" alt="${escapeHtml(p.filename)}" loading="lazy" decoding="async" fetchpriority="low">
    <span class="photo-name">${escapeHtml(p.filename)}</span>
    <button class="heart-btn ${p.selected?"selected":""}" data-select="${p.id}" aria-label="Pilih foto">${p.selected?"♥":"♡"}</button>
  </article>`).join("")||'<p class="muted">Belum ada foto dalam galeri ini. Silakan hubungi admin.</p>';
@@ -136,10 +170,8 @@ function renderReviewList(){
    :"Periksa kembali foto. Anda masih bisa membatalkan pilihan sebelum dikirim.";
  $("reviewFooterCount").textContent=`${chosen.length} foto dipilih`;
  $("reviewList").innerHTML=chosen.map((p,i)=>`
-   <article class="review-photo" data-review-id="${p.id}">
-     <img src="${escapeHtml(p.preview_url||"")}" alt="${escapeHtml(p.filename)}" loading="lazy"
-       onerror="if(this.dataset.driveId && !this.dataset.fallback){this.dataset.fallback='1';this.src='https://drive.google.com/uc?export=view&id='+encodeURIComponent(this.dataset.driveId)}else{this.style.opacity='.2'}"
-       data-drive-id="${escapeHtml(p.drive_file_id||"")}">
+   <article class="review-photo image-loading" data-review-id="${p.id}">
+     <img class="review-thumb" src="${escapeHtml(p.preview_url||(p.drive_file_id?`https://drive.google.com/uc?export=view&id=${encodeURIComponent(p.drive_file_id)}`:""))}" alt="${escapeHtml(p.filename)}" loading="lazy" decoding="async" fetchpriority="low" data-image-state="loading" data-fallback="${p.preview_url?"0":"1"}" data-drive-id="${escapeHtml(p.drive_file_id||"")}">
      <div class="review-photo-meta"><b>${i+1}. ${escapeHtml(p.filename)}</b><small>Foto pilihan Anda</small></div>
      ${gallery?.selection_status==="submitted"&&!gallery?.revision_allowed?"":`<button type="button" class="review-remove" data-remove-selection="${p.id}">Batalkan pilihan</button>`}
    </article>`).join("") || '<div class="review-empty"><b>Belum ada foto pilihan.</b><span>Kembali ke galeri untuk memilih foto favorit Anda.</span></div>';
@@ -148,9 +180,17 @@ function openPreview(id){
  currentIndex=photos.findIndex(p=>p.id===id);if(currentIndex<0)return;
  const p=photos[currentIndex];
  const previewImage=$("previewArt");
- previewImage.onerror=()=>{if(p.drive_file_id && !previewImage.dataset.fallback){previewImage.dataset.fallback="1";previewImage.src=`https://drive.google.com/uc?export=view&id=${encodeURIComponent(p.drive_file_id)}`;}};
- previewImage.dataset.fallback="";
- previewImage.src=p.preview_url||"";$("previewName").textContent=p.filename;
+ previewImage.onload=()=>{previewImage.dataset.imageState="loaded";previewImage.classList.remove("image-failed");};
+ previewImage.onerror=()=>{
+  if(p.drive_file_id && previewImage.dataset.fallback!=="1"){
+   previewImage.dataset.fallback="1";
+   previewImage.src=`https://drive.google.com/uc?export=view&id=${encodeURIComponent(p.drive_file_id)}`;
+  }else{previewImage.dataset.imageState="failed";previewImage.classList.add("image-failed");}
+ };
+ previewImage.dataset.fallback=p.preview_url?"0":"1";
+ previewImage.dataset.imageState="loading";
+ previewImage.classList.remove("image-failed");
+ previewImage.src=p.preview_url||(p.drive_file_id?`https://drive.google.com/uc?export=view&id=${encodeURIComponent(p.drive_file_id)}`:"");$("previewName").textContent=p.filename;
  $("previewSelect").textContent=p.selected?"♥ Foto Terpilih":"♡ Pilih Foto";
  $("previewSelect").disabled=gallery.selection_status==="submitted"&&!gallery.revision_allowed;
  $("previewSkip").textContent=swipeMode?"Lewati →":"Tutup foto";
