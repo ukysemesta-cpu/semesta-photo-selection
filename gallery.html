@@ -27,13 +27,23 @@
     <div class="selection-summary"><div><span class="muted">Foto terpilih</span><strong><span id="selectedCount">0</span><small id="selectionLimit"> / 20 foto</small></strong></div><div class="progress-track"><div id="progressBar"></div></div><button class="btn btn-primary" id="submitSelection">Kirim Pilihan Foto</button></div>
     <div class="gallery-tools">
       <div class="gallery-tools-top"><div><b>Preview Foto</b><small id="photoCount">Memuat foto...</small></div>
-        <div class="gallery-filters"><button class="filter-btn active" id="allFilter" type="button">Semua Foto</button><button class="filter-btn" id="highlightFilter" type="button" hidden>★ Highlight</button><button class="filter-btn" id="selectedFilter" type="button">♥ Terpilih</button></div>
+        <div class="gallery-filters"><button class="filter-btn active" id="allFilter" type="button">Semua Foto</button><button class="filter-btn" id="highlightFilter" type="button" hidden>★ Highlight</button><button class="filter-btn" id="selectedFilter" type="button">♥ Terpilih</button><button class="btn btn-secondary review-open-btn" id="openReview" type="button">Lihat Pilihan (<span id="reviewCount">0</span>)</button></div>
       </div>
       <div class="gallery-controls"><label class="gallery-search"><span>⌕</span><input id="photoSearch" type="search" placeholder="Cari nama foto..." autocomplete="off"></label><label class="gallery-sort"><span>Urutkan:</span><select id="photoSort"><option value="original">Urutan asli</option><option value="az">Nama A–Z</option><option value="za">Nama Z–A</option><option value="selected">Terpilih dahulu</option></select></label></div>
     </div>
     <div class="photo-grid" id="photoGrid"></div>
     <p class="demo-warning" id="galleryNotice">Galeri foto Semesta.</p>
   </main>
+  <div class="review-modal" id="reviewModal" aria-hidden="true">
+    <section class="review-panel" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+      <header class="review-header">
+        <div><span class="eyebrow">SELEKSI FOTO SEMESTA</span><h2 id="reviewTitle">Foto Pilihan Anda</h2><p id="reviewSubtitle">Periksa kembali foto sebelum dikirim.</p></div>
+        <button class="review-close" id="closeReview" type="button" aria-label="Tutup">×</button>
+      </header>
+      <div class="review-list" id="reviewList"></div>
+      <footer class="review-footer"><span id="reviewFooterCount">0 foto dipilih</span><button class="btn btn-primary" id="reviewDone" type="button">Kembali ke Galeri</button></footer>
+    </section>
+  </div>
   <div class="modal" id="previewModal" aria-hidden="true"><button class="modal-close" id="closePreview">×</button><button class="modal-arrow prev" id="prevPhoto">‹</button><div class="preview-content"><img class="preview-art" id="previewArt" alt="Preview foto" style="object-fit:contain;max-width:100%;max-height:70vh;"><div class="preview-caption"><span id="previewName">Foto</span><button class="btn btn-primary" id="previewSelect">♡ Pilih Foto</button></div></div><button class="modal-arrow next" id="nextPhoto">›</button></div>
   <script>
     const q = new URLSearchParams(location.search);
@@ -44,6 +54,6 @@ if (pageToken) document.getElementById("progressLink").href = `progress.html?tok
     helpBtn.addEventListener("click", () => helpDropdown.classList.toggle("show"));
     document.addEventListener("click", e => { if (!e.target.closest(".help-menu")) helpDropdown.classList.remove("show"); });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/gallery-drive-v11.js?v=20261102-search-sort-1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/gallery-drive-v11.js?v=20261102-review-selection-1"></script>
 </body>
 </html>
