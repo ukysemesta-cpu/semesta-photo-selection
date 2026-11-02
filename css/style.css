@@ -305,3 +305,22 @@ body{background:#174b35;color:var(--ink)}
  .selection-summary .progress-track{grid-column:1/-1;grid-row:2}
  .selection-summary #submitSelection{grid-column:1/-1;width:100%;grid-row:3}
 }
+
+
+/* PERFORMANCE V1 — client gallery image loading, fallback and failure states */
+.photo-card{isolation:isolate;background:#e9efea}
+.photo-card::before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(100deg,#e7ede8 20%,#f5f7f4 38%,#e7ede8 56%);background-size:220% 100%;animation:semesta-image-shimmer 1.35s ease-in-out infinite}
+.photo-card .photo-thumb{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .22s ease}
+.photo-card:not(.image-loading) .photo-thumb,.photo-card .photo-thumb[data-image-state="loaded"]{opacity:1}
+.photo-card.image-failed::after{content:"Preview tidak tersedia";position:absolute;z-index:2;left:8px;right:8px;top:50%;transform:translateY(-50%);text-align:center;color:#64766b;font-size:11px;font-weight:700;pointer-events:none}
+.photo-card.image-failed .photo-thumb{opacity:0}
+.photo-card .photo-name,.photo-card .heart-btn{z-index:3}
+.review-photo{position:relative;background:#fff}
+.review-photo img.review-thumb{opacity:0;transition:opacity .2s ease}
+.review-photo img.review-thumb[data-image-state="loaded"]{opacity:1}
+.review-photo.image-loading img{background:linear-gradient(100deg,#e7ede8 20%,#f5f7f4 38%,#e7ede8 56%);background-size:220% 100%;animation:semesta-image-shimmer 1.35s ease-in-out infinite}
+.review-photo.image-failed::after{content:"Preview tidak tersedia";font-size:9px;color:#718078;max-width:78px;text-align:center;flex:0 0 auto}
+#previewArt{background:#1c3027}
+#previewArt.image-failed{opacity:.35}
+@keyframes semesta-image-shimmer{to{background-position-x:-220%}}
+@media(prefers-reduced-motion:reduce){.photo-card::before,.review-photo.image-loading img{animation:none}.photo-card .photo-thumb,.review-photo img.review-thumb{transition:none}}
