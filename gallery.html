@@ -54,6 +54,23 @@ if (pageToken) document.getElementById("progressLink").href = `progress.html?tok
     helpBtn.addEventListener("click", () => helpDropdown.classList.toggle("show"));
     document.addEventListener("click", e => { if (!e.target.closest(".help-menu")) helpDropdown.classList.remove("show"); });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/gallery-drive-v11.js?v=20261102-performance-v1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script>
+    (function trackClientGalleryView(){
+      const token = new URLSearchParams(location.search).get("token");
+      const cfg = window.SEMESTA_SUPABASE_CONFIG;
+      if (!token || !window.supabase || !cfg?.url || !cfg?.publishableKey) return;
+      try {
+        const trackerClient = window.supabase.createClient(cfg.url, cfg.publishableKey);
+        trackerClient.rpc("track_gallery_view", { p_token: token })
+          .then(({ error }) => { if (error) console.warn("Gallery view tracking:", error.message); })
+          .catch(error => console.warn("Gallery view tracking failed:", error));
+      } catch (error) {
+        console.warn("Gallery view tracking unavailable:", error);
+      }
+    })();
+  </script>
+  <script src="js/gallery-drive-v11.js?v=20261102-gallery-view-tracker-v1"></script>
 </body>
 </html>
