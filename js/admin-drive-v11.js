@@ -413,32 +413,143 @@ async function chosenNames(g){
   const names=await getSelections(g);return names;
 }
 async function choosePhotoFormat(){const v=prompt("Pilih format:\n1 = JPG/JPEG\n2 = RAW\n3 = JPG + RAW","1");return v==="1"?"jpg":v==="2"?"raw":v==="3"?"both":null;}
-async function downloadChosenFromComputer(g){
-  const chosen=await chosenNames(g);if(!chosen.length){alert("Belum ada pilihan foto yang tersimpan.");return;}
-  const format=await choosePhotoFormat();if(!format)return;
-  if(!window.showDirectoryPicker){alert("Gunakan Chrome/Edge terbaru melalui localhost atau HTTPS.");return;}
-  try{
-    const dir=await window.showDirectoryPicker({mode:"read"}),wanted=new Set(chosen.map(filenameBase));let count=0;
-    for await(const entry of dir.values()){
-      if(entry.kind!=="file")continue;const ext=fileExtension(entry.name),jpg=["jpg","jpeg"].includes(ext),raw=RAW_EXTENSIONS.has(ext);
-      if(!wanted.has(filenameBase(entry.name))||(format==="jpg"&&!jpg)||(format==="raw"&&!raw)||(format==="both"&&!jpg&&!raw))continue;
-      const file=await entry.getFile(),url=URL.createObjectURL(file),a=document.createElement("a");a.href=url;a.download=entry.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);count++;
+function collectMatchingLocalFiles(fileList, chosen, format, onlyOri=false) {
+  const wanted = new Set(chosen.map(filenameBase));
+  return Array.from(fileList || []).filter(file => {
+    const rel = String(file.webkitRelativePath || file.name).replace(/\\/g, "/");
+    const parts = rel.split("/");
+    const inOri = parts.some(part => part.toLocaleUpperCase("id") === "ORI");
+    const ext = fileExtension(file.name);
+    const jpg = ["jpg", "jpeg"].includes(ext);
+    const raw = RAW_EXTENSIONS.has(ext);
+    if (onlyOri && !inOri) return false;
+    if (!onlyOri && format === "jpg" && !jpg) return false;
+    if (!onlyOri && format === "raw" && !raw) return false;
+    if (!onlyOri && format === "both" && !jpg && !raw) return false;
+    return wanted.has(filenameBase(file.name));
+  });
+}
+function downloadLocalFiles(files) {
+  files.forEach((file, index) => {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    // Small spacing helps browsers process multiple downloads.
+    setTimeout(() => {
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }, index * 180);
+  });
+}
+function pickLocalFolderFallback({onlyOri=false, format="both"}={}) {
+  return new Promise(resolve => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.setAttribute("webkitdirectory", "");
+    input.setAttribute("directory", "");
+    input.multiple = true;
+    input.accept = "*/*";
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.addEventListener("change", () => {
+      const files = Array.from(input.files || []);
+      input.remove();
+      resolve(collectMatchingLocalFiles(files, window.__semestaFolderChosen || [], format, onlyOri));
+    }, { once: true });
+    input.addEventListener("cancel", () => { input.remove(); resolve(null); }, { once: true });
+    input.click();
+  });
+}
+async function walkDirectoryFiles(dir, prefix="") {
+  const found = [];
+  for await (const entry of dir.values()) {
+    if (entry.kind === "file") {
+      found.push({file: await entry.getFile(), relativePath: `${prefix}${entry.name}`});
+    } else if (entry.kind === "directory") {
+      const child = await dir.getDirectoryHandle(entry.name);
+      found.push(...await walkDirectoryFiles(child, `${prefix}${entry.name}/`));
     }
-    alert(count?`${count} file sedang diunduh.`:"Tidak ada file yang cocok di folder pilihan.");
-  }catch(e){if(e.name!=="AbortError")alert(e.message);}
+  }
+  return found;
+}
+async function downloadChosenFromComputer(g){
+  const chosen=await chosenNames(g);
+  if(!chosen.length){alert("Belum ada pilihan foto yang tersimpan.");return;}
+  const format=await choosePhotoFormat();if(!format)return;
+
+  if (window.isSecureContext !== true) {
+    alert("Browser belum berada pada Secure Context. Buka aplikasi melalui HTTPS atau localhost, bukan HTTP.");
+    return;
+  }
+
+  try {
+    if (typeof window.showDirectoryPicker === "function") {
+      const dir = await window.showDirectoryPicker({mode:"read"});
+      const files = await walkDirectoryFiles(dir);
+      const wanted = new Set(chosen.map(filenameBase));
+      const matched = files
+        .filter(item => {
+          const ext=fileExtension(item.file.name),jpg=["jpg","jpeg"].includes(ext),raw=RAW_EXTENSIONS.has(ext);
+          return wanted.has(filenameBase(item.file.name)) &&
+            (format==="jpg"?jpg:format==="raw"?raw:(jpg||raw));
+        })
+        .map(item=>item.file);
+      if(!matched.length){alert("Tidak ditemukan file yang cocok. Pilih folder induk yang berisi subfolder EDIT dan ORI.");return;}
+      downloadLocalFiles(matched);
+      alert(`${matched.length} file cocok. Download sedang diproses.`);
+      return;
+    }
+
+    // Fallback for browsers without the File System Access API.
+    window.__semestaFolderChosen = chosen;
+    const files = await pickLocalFolderFallback({format});
+    window.__semestaFolderChosen = [];
+    if(files === null) return;
+    if(!files.length){alert("Tidak ditemukan file JPG/RAW yang cocok. Pilih folder induk yang berisi subfolder EDIT dan ORI.");return;}
+    downloadLocalFiles(files);
+    alert(`${files.length} file cocok. Download sedang diproses.`);
+  } catch(e) {
+    if(e.name!=="AbortError") alert("Gagal membaca folder: "+(e.message||e));
+  }
 }
 async function copyChosenOriToEdit(g){
-  const chosen=await chosenNames(g);if(!chosen.length){alert("Belum ada pilihan foto.");return;}
-  if(!window.showDirectoryPicker){alert("Gunakan Chrome/Edge terbaru melalui localhost atau HTTPS.");return;}
+  const chosen=await chosenNames(g);
+  if(!chosen.length){alert("Belum ada pilihan foto.");return;}
+  if (window.isSecureContext !== true) {
+    alert("Browser belum berada pada Secure Context. Buka aplikasi melalui HTTPS atau localhost, bukan HTTP.");
+    return;
+  }
+
+  if (typeof window.showDirectoryPicker !== "function") {
+    // Browsers without directory-write support cannot copy directly into a local folder.
+    window.__semestaFolderChosen = chosen;
+    const files = await pickLocalFolderFallback({onlyOri:true});
+    window.__semestaFolderChosen = [];
+    if(files === null) return;
+    if(!files.length){alert("Tidak ditemukan file pilihan di subfolder ORI. Pilih folder induk yang berisi folder ORI dan EDIT.");return;}
+    downloadLocalFiles(files);
+    alert(`${files.length} file ORI berhasil disiapkan untuk diunduh. Karena browser ini tidak mendukung penulisan folder lokal, pindahkan hasil download ke folder EDIT secara manual.`);
+    return;
+  }
+
   try{
-    const parent=await window.showDirectoryPicker({mode:"readwrite"}),ori=await parent.getDirectoryHandle("ORI"),edit=await parent.getDirectoryHandle("EDIT",{create:true});
+    const parent=await window.showDirectoryPicker({mode:"readwrite"});
+    const ori=await parent.getDirectoryHandle("ORI");
+    const edit=await parent.getDirectoryHandle("EDIT",{create:true});
     const wanted=new Set(chosen.map(filenameBase));let count=0;
     for await(const entry of ori.values()){
       if(entry.kind!=="file"||!wanted.has(filenameBase(entry.name)))continue;
-      const file=await entry.getFile(),target=await edit.getFileHandle(entry.name,{create:true}),w=await target.createWritable();await w.write(file);await w.close();count++;
+      const file=await entry.getFile();
+      const target=await edit.getFileHandle(entry.name,{create:true});
+      const w=await target.createWritable();await w.write(file);await w.close();count++;
     }
-    alert(`${count} file berhasil disalin ke EDIT.`);
-  }catch(e){if(e.name!=="AbortError")alert("Gagal menyalin: "+e.message);}
+    alert(`${count} file berhasil disalin dari ORI ke EDIT.`);
+  }catch(e){
+    if(e.name!=="AbortError")alert("Gagal menyalin: "+(e.message||e)+"\\nPastikan folder yang dipilih berisi subfolder ORI dan EDIT.");
+  }
 }
 
 $("galleryTable").addEventListener("click",async event=>{
