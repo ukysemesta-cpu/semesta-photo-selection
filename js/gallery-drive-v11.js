@@ -2,9 +2,83 @@ const cfg=window.SEMESTA_SUPABASE_CONFIG;
 const sb=window.supabase.createClient(cfg.url,cfg.publishableKey);
 const params=new URLSearchParams(location.search),token=params.get("token");
 const $=id=>document.getElementById(id);
-let gallery=null,photos=[],currentIndex=0,showingSelected=false,showingHighlight=false,searchTerm="",sortMode="original",swipeMode=false;
+let gallery=null,photos=[],currentIndex=0,showingSelected=false,showingHighlight=false,searchTerm="",sortMode="original",swipeMode=false,draftSaveTimer=null,draftSaving=false,draftDirty=false,draftSaveQueue=Promise.resolve(),lastDraftIds="";
 if(!token){$("galleryNotice").textContent="Link galeri tidak lengkap. Silakan minta link terbaru dari admin.";throw new Error("Missing gallery token");}
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function currentDraftIds(){
+ return photos.filter(p=>p.selected).map(p=>p.id).sort();
+}
+function setDraftStatus(message, isError=false){
+ const el=$("draftSyncStatus");
+ if(!el)return;
+ el.textContent=message;
+ el.classList.toggle("error",!!isError);
+}
+async function loadSelectionDraft(showMessage=false){
+ if(!gallery || gallery.selection_status==="submitted")return;
+ try{
+  const {data,error}=await sb.rpc("get_photo_selection_draft",{p_token:token});
+  if(error)throw error;
+  const ids=Array.isArray(data?.photo_ids)?data.photo_ids:[];
+  const idSet=new Set(ids);
+  photos.forEach(p=>p.selected=idSet.has(p.id));
+  lastDraftIds=currentDraftIds().join(",");
+  draftDirty=false;
+  render();
+  if(showMessage)setDraftStatus("Pilihan sementara berhasil disinkronkan.");
+ }catch(err){
+  console.error("Load selection draft failed:",err);
+  setDraftStatus("Sinkronisasi belum tersedia. Hubungi admin.",true);
+ }
+}
+function queueDraftSave(){
+ if(!gallery || gallery.selection_status==="submitted")return;
+ draftDirty=true;
+ setDraftStatus("Menyimpan pilihan...");
+ clearTimeout(draftSaveTimer);
+ draftSaveTimer=setTimeout(()=>saveSelectionDraft(),450);
+}
+async function saveSelectionDraft(){
+ if(!gallery || gallery.selection_status==="submitted" || !draftDirty)return;
+ const ids=currentDraftIds();
+ const snapshot=ids.join(",");
+ draftSaving=true;
+ draftSaveQueue=draftSaveQueue.then(async()=>{
+  const {data,error}=await sb.rpc("save_photo_selection_draft",{p_token:token,p_photo_ids:ids});
+  if(error)throw error;
+  if(!data?.ok)throw new Error(data?.message||"Pilihan sementara tidak dapat disimpan.");
+  lastDraftIds=snapshot;
+  if(currentDraftIds().join(",")===snapshot){
+   draftDirty=false;
+   setDraftStatus("Pilihan tersimpan · dapat dilanjutkan di perangkat lain.");
+  }else{
+   draftDirty=true;
+   clearTimeout(draftSaveTimer);
+   draftSaveTimer=setTimeout(()=>saveSelectionDraft(),250);
+  }
+ }).catch(err=>{
+  console.error("Save selection draft failed:",err);
+  setDraftStatus("Gagal menyimpan pilihan sementara. Periksa koneksi.",true);
+ });
+ try{await draftSaveQueue;}finally{draftSaving=false;}
+}
+async function refreshDraftFromServer(){
+ if(!gallery || gallery.selection_status==="submitted" || draftDirty || draftSaving)return;
+ try{
+  const {data,error}=await sb.rpc("get_photo_selection_draft",{p_token:token});
+  if(error)throw error;
+  const ids=Array.isArray(data?.photo_ids)?data.photo_ids:[];
+  const snapshot=[...ids].sort().join(",");
+  if(snapshot!==lastDraftIds){
+   const idSet=new Set(ids);
+   photos.forEach(p=>p.selected=idSet.has(p.id));
+   lastDraftIds=snapshot;
+   render();
+   if($("reviewModal")?.classList.contains("open"))renderReviewList();
+   setDraftStatus("Pilihan diperbarui dari perangkat lain.");
+  }
+ }catch(err){console.warn("Draft refresh failed:",err);}
+}
 function selectedCount(){return photos.filter(p=>p.selected).length;}
 function render(){
  let visible=photos.filter(p=>(!showingSelected||p.selected)&&(!showingHighlight||p.is_highlight));
@@ -94,6 +168,7 @@ async function togglePhoto(id){
  if(!p.selected&&Number(gallery.selection_limit)>0&&selectedCount()>=Number(gallery.selection_limit)){alert(`Maksimal pilihan ${gallery.selection_limit} foto.`);return;}
  p.selected=!p.selected;render();
  if($("reviewModal").classList.contains("open"))renderReviewList();
+ queueDraftSave();
 }
 $("photoGrid").addEventListener("click",e=>{
  const b=e.target.closest("[data-select]");if(b){e.stopPropagation();togglePhoto(b.dataset.select);return;}
@@ -143,12 +218,16 @@ $("submitSelection").addEventListener("click",async()=>{
  const chosen=photos.filter(p=>p.selected);
  if(!chosen.length){alert("Pilih minimal satu foto terlebih dahulu.");return;}
  if(!confirm(`Kirim ${chosen.length} foto pilihan kepada admin Semesta? Setelah dikirim, pilihan terkunci dan perubahan harus melalui admin.`))return;
+ clearTimeout(draftSaveTimer);
+ if(draftDirty)await saveSelectionDraft();
  $("submitSelection").disabled=true;
  const {data,error}=await sb.rpc("submit_photo_selection",{p_token:token,p_photo_ids:chosen.map(p=>p.id)});
  $("submitSelection").disabled=false;
  if(error){alert("Gagal mengirim pilihan: "+error.message);return;}
  if(!data?.ok){alert(data?.message||"Pilihan tidak dapat dikirim.");return;}
  gallery.selection_status="submitted";gallery.submitted_at=new Date().toISOString();
+ draftDirty=false;clearTimeout(draftSaveTimer);
+ setDraftStatus("Pilihan final sudah dikirim dan terkunci.");
  const admin=prompt("Pilih nomor WhatsApp admin:\n1. Admin 1 — 0858 0000 7878\n2. Admin 2 — 0823 2471 4989","1");
  if(admin==="1"||admin==="2"){
    const number=admin==="1"?"6285800007878":"6282324714989";
@@ -184,9 +263,15 @@ async function init(){
    return;
  }
  gallery=data.gallery;photos=(data.photos||[]).map(p=>({...p,selected:!!p.selected}));
+ if(gallery.selection_status!=="submitted"){
+  await loadSelectionDraft(false);
+ }else{
+  photos.forEach(p=>p.selected=!!p.selected);
+ }
  $("clientGalleryTitle").textContent=gallery.gallery_name;
  $("clientGreeting").textContent=`Halo ${gallery.client_name}, silakan pilih foto untuk editing. Batas pemilihan: ${gallery.selection_deadline||"—"}.`;
  $("galleryNotice").textContent=gallery.selection_status==="submitted"?"Pilihan Anda sudah dikirim. Terima kasih!":"Silakan pilih foto sesuai kuota yang tersedia.";
  render();
 }
 init();
+window.setInterval(refreshDraftFromServer,12000);
