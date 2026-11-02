@@ -280,3 +280,12 @@ body{background:#174b35;color:var(--ink)}
  .notification-item{flex-wrap:wrap}
  .notification-read-one{margin-left:18px}
 }
+
+/* Admin gallery management V1 */
+.gallery-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
+.gallery-tools input,.gallery-tools select{min-height:38px;border:1px solid #dce7dd;border-radius:8px;padding:8px 11px;background:#fff;color:#24382d;font:12px "DM Sans",sans-serif}
+.gallery-tools input{flex:1;min-width:220px}
+.gallery-tools select{min-width:170px}
+.gallery-view-label{font-size:11px;color:#718078;margin:0 0 10px}
+.archive-action{background:#f8f5e7;border-color:#e8dfb5;color:#655b2e}
+@media(max-width:650px){.gallery-tools{display:grid;grid-template-columns:1fr}.gallery-tools input,.gallery-tools select,.gallery-tools button{width:100%}}
