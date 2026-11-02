@@ -17,6 +17,79 @@ if (missingAdminIds.length) {
 let galleries = [];
 let selectedPhotoCounts = {};
 let currentUser = null;
+let notificationRefreshTimer = null;
+let adminNotifications = [];
+
+function formatNotificationDate(value) {
+  if (!value) return "Waktu tidak tersedia";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Waktu tidak tersedia";
+  return date.toLocaleString("id-ID", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+
+function renderNotifications() {
+  const badge = $("notificationBadge");
+  const list = $("notificationList");
+  const summary = $("notificationSummary");
+  if (!badge || !list || !summary) return;
+  const unread = adminNotifications.filter(item => !item.is_read).length;
+  badge.textContent = unread > 99 ? "99+" : String(unread);
+  badge.hidden = unread === 0;
+  summary.textContent = unread ? `${unread} notifikasi belum dibaca` : "Semua notifikasi sudah dibaca";
+  if (!adminNotifications.length) {
+    list.innerHTML = '<div class="notification-empty">Belum ada notifikasi pilihan foto dari klien.</div>';
+    return;
+  }
+  list.innerHTML = adminNotifications.map(item => {
+    const revision = item.notification_type === "revision_submitted";
+    const title = revision ? "Revisi pilihan foto dikirim" : "Pilihan foto berhasil dikirim";
+    return `<article class="notification-item ${item.is_read ? "" : "unread"}" data-notification-id="${escapeHtml(item.id)}">
+      <span class="notification-dot" aria-hidden="true"></span>
+      <div class="notification-item-content">
+        <b>${title}</b>
+        <strong>${escapeHtml(item.client_name || "Klien")} · ${escapeHtml(item.gallery_name || "Galeri")}</strong>
+        <small>${formatNotificationDate(item.created_at)}</small>
+      </div>
+      ${item.is_read ? "" : `<button type="button" class="notification-read-one" data-read-notification="${escapeHtml(item.id)}">Tandai dibaca</button>`}
+    </article>`;
+  }).join("");
+}
+
+async function loadAdminNotifications() {
+  if (!currentUser || !$("notificationList")) return;
+  const { data, error } = await sb.from("admin_notifications")
+    .select("id,gallery_id,client_name,gallery_name,notification_type,created_at,is_read")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    console.warn("Notifikasi admin belum dapat dimuat:", error.message);
+    $("notificationList").innerHTML = `<div class="notification-empty">Notifikasi belum tersedia. Jalankan SQL notifikasi terlebih dahulu.</div>`;
+    return;
+  }
+  adminNotifications = data || [];
+  renderNotifications();
+}
+
+async function markNotificationRead(id) {
+  const { error } = await sb.from("admin_notifications").update({ is_read: true }).eq("id", id);
+  if (error) { alert("Gagal memperbarui notifikasi: " + error.message); return; }
+  await loadAdminNotifications();
+}
+
+async function markAllNotificationsRead() {
+  const unreadIds = adminNotifications.filter(item => !item.is_read).map(item => item.id);
+  if (!unreadIds.length) return;
+  const { error } = await sb.from("admin_notifications").update({ is_read: true }).in("id", unreadIds);
+  if (error) { alert("Gagal menandai notifikasi: " + error.message); return; }
+  await loadAdminNotifications();
+}
+
+function startNotificationRefresh() {
+  if (notificationRefreshTimer) clearInterval(notificationRefreshTimer);
+  loadAdminNotifications();
+  notificationRefreshTimer = setInterval(loadAdminNotifications, 30000);
+}
+
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -457,6 +530,26 @@ document.querySelectorAll("[data-stat]").forEach(card=>card.addEventListener("cl
 $("closeDetails").addEventListener("click",()=>{$("detailsModal").classList.remove("open");$("detailsModal").setAttribute("aria-hidden","true")});
 $("detailsModal").addEventListener("click",e=>{if(e.target===$("detailsModal"))$("closeDetails").click()});
 
+$("notificationBell")?.addEventListener("click", async () => {
+  const panel = $("notificationPanel");
+  const willOpen = panel.hidden;
+  panel.hidden = !willOpen;
+  $("notificationBell").setAttribute("aria-expanded", String(willOpen));
+  if (willOpen) await loadAdminNotifications();
+});
+$("notificationList")?.addEventListener("click", async event => {
+  const button = event.target.closest("[data-read-notification]");
+  if (button) await markNotificationRead(button.dataset.readNotification);
+});
+$("markAllNotificationsRead")?.addEventListener("click", markAllNotificationsRead);
+document.addEventListener("click", event => {
+  const wrap = document.querySelector(".notification-wrap");
+  if (wrap && !wrap.contains(event.target)) {
+    $("notificationPanel").hidden = true;
+    $("notificationBell").setAttribute("aria-expanded", "false");
+  }
+});
+
 function showLoginError(message) {
   $("loginError").textContent = message;
   $("authGate").classList.add("show");
@@ -491,6 +584,7 @@ async function acceptSession(session) {
     $("signedInEmail").textContent = profile.display_name || currentUser.email;
     $("authGate").classList.remove("show");
     await loadGalleries();
+    startNotificationRefresh();
     return true;
   } catch (err) {
     console.error("Admin verification failed:", err);
@@ -537,11 +631,17 @@ $("logoutButton").addEventListener("click", async () => {
     alert("Gagal logout: " + error.message);
     return;
   }
+  if (notificationRefreshTimer) clearInterval(notificationRefreshTimer);
+  notificationRefreshTimer = null;
   location.reload();
 });
 
 sb.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_OUT") {
+    if (notificationRefreshTimer) clearInterval(notificationRefreshTimer);
+    notificationRefreshTimer = null;
+    currentUser = null;
+    adminNotifications = [];
     $("authGate").classList.add("show");
   }
 });
