@@ -468,15 +468,15 @@ $("galleryTable").addEventListener("click",async event=>{
       alert("Arsipkan galeri terlebih dahulu sebelum menghapus permanen.");return;
     }
     const phrase = `HAPUS ${g.clientName}`;
-    const typed = prompt(`PERINGATAN: Penghapusan permanen tidak dapat dibatalkan.\n\nGaleri: ${g.galleryName}\nKlien: ${g.clientName}\n\nFoto asli di Google Drive tidak dihapus. Data galeri, draft, pilihan, dan riwayat terkait akan dihapus dari database.\n\nKetik persis: ${phrase}`);
+    const typed = prompt(`PERINGATAN: Penghapusan permanen tidak dapat dibatalkan.\n\nPreview di Supabase Storage juga akan dibersihkan. Foto asli Google Drive tetap aman.\n\nGaleri: ${g.galleryName}\nKlien: ${g.clientName}\n\nFoto asli di Google Drive tidak dihapus. Data galeri, draft, pilihan, dan riwayat terkait akan dihapus dari database.\n\nKetik persis: ${phrase}`);
     if(typed !== phrase){ if(typed !== null) alert("Konfirmasi tidak cocok. Galeri tidak dihapus."); return; }
     const button=t.closest("[data-purge]");button.disabled=true;
     try{
-      const {data,error}=await sb.rpc("permanently_delete_archived_gallery",{p_gallery_id:g.id});
+      const {data,error}=await sb.functions.invoke("permanently-delete-gallery",{body:{gallery_id:g.id}});
       if(error)throw error;
       if(!data?.ok)throw new Error(data?.message || "Penghapusan tidak berhasil.");
       await loadGalleries();
-      alert("Galeri dan data database terkait berhasil dihapus permanen. File asli Google Drive tetap aman.");
+      alert("Galeri, data database terkait, dan file preview Supabase Storage berhasil dibersihkan. Foto asli Google Drive tetap aman.");
     }catch(err){
       alert("Gagal menghapus permanen: "+(err.message||"Kesalahan tidak diketahui"));
       button.disabled=false;
