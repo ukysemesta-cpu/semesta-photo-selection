@@ -32,7 +32,7 @@
       <div class="gallery-controls"><label class="gallery-search"><span>⌕</span><input id="photoSearch" type="search" placeholder="Cari nama foto..." autocomplete="off"></label><label class="gallery-sort"><span>Urutkan:</span><select id="photoSort"><option value="original">Urutan asli</option><option value="az">Nama A–Z</option><option value="za">Nama Z–A</option><option value="selected">Terpilih dahulu</option></select></label></div>
     </div>
     <div class="photo-grid" id="photoGrid"></div>
-    <p class="demo-warning" id="galleryNotice">Galeri foto Semesta.</p>
+    <p class="demo-warning" id="galleryNotice">Galeri foto Semesta.</p><p class="draft-sync-status" id="draftSyncStatus" aria-live="polite">Pilihan sementara tersimpan di akun galeri.</p>
   </main>
   <div class="review-modal" id="reviewModal" aria-hidden="true">
     <section class="review-panel" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
@@ -54,6 +54,6 @@ if (pageToken) document.getElementById("progressLink").href = `progress.html?tok
     helpBtn.addEventListener("click", () => helpDropdown.classList.toggle("show"));
     document.addEventListener("click", e => { if (!e.target.closest(".help-menu")) helpDropdown.classList.remove("show"); });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/gallery-drive-v11.js?v=20261102-swipe-mode-v1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/gallery-drive-v11.js?v=20261102-cross-device-draft-v1"></script>
 </body>
 </html>
