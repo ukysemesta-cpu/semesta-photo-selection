@@ -15,7 +15,7 @@ function setDraftStatus(message, isError=false){
  el.classList.toggle("error",!!isError);
 }
 async function loadSelectionDraft(showMessage=false){
- if(!gallery || gallery.selection_status==="submitted")return;
+ if(!gallery || (gallery.selection_status==="submitted" && !gallery.revision_allowed))return;
  try{
   const {data,error}=await sb.rpc("get_photo_selection_draft",{p_token:token});
   if(error)throw error;
@@ -32,14 +32,14 @@ async function loadSelectionDraft(showMessage=false){
  }
 }
 function queueDraftSave(){
- if(!gallery || gallery.selection_status==="submitted")return;
+ if(!gallery || (gallery.selection_status==="submitted" && !gallery.revision_allowed))return;
  draftDirty=true;
  setDraftStatus("Menyimpan pilihan...");
  clearTimeout(draftSaveTimer);
  draftSaveTimer=setTimeout(()=>saveSelectionDraft(),450);
 }
 async function saveSelectionDraft(){
- if(!gallery || gallery.selection_status==="submitted" || !draftDirty)return;
+ if(!gallery || (gallery.selection_status==="submitted" && !gallery.revision_allowed) || !draftDirty)return;
  const ids=currentDraftIds();
  const snapshot=ids.join(",");
  draftSaving=true;
@@ -63,7 +63,7 @@ async function saveSelectionDraft(){
  try{await draftSaveQueue;}finally{draftSaving=false;}
 }
 async function refreshDraftFromServer(){
- if(!gallery || gallery.selection_status==="submitted" || draftDirty || draftSaving)return;
+ if(!gallery || (gallery.selection_status==="submitted" && !gallery.revision_allowed) || draftDirty || draftSaving)return;
  try{
   const {data,error}=await sb.rpc("get_photo_selection_draft",{p_token:token});
   if(error)throw error;
@@ -98,8 +98,13 @@ function render(){
  $("reviewCount").textContent=count;
  $("selectionLimit").textContent=limit===0?" / tanpa batas":` / ${limit} foto`;
  $("progressBar").style.width=(limit===0?Math.min(count*5,100):Math.min(count/Math.max(limit,1)*100,100))+"%";
- $("submitSelection").disabled=gallery.selection_status==="submitted";
- if(gallery.selection_status==="submitted")$("submitSelection").textContent="Pilihan Sudah Dikirim";
+ const locked=gallery.selection_status==="submitted" && !gallery.revision_allowed;
+ $("submitSelection").disabled=locked;
+ $("submitSelection").textContent=locked?"Pilihan Sudah Dikirim":(gallery.selection_status==="submitted"&&gallery.revision_allowed?"Kirim Revisi Foto":"Kirim Pilihan Foto");
+ if($("draftSyncStatus")){
+   if(locked)$("draftSyncStatus").textContent="Pilihan final terkunci. Hubungi admin jika ingin revisi.";
+   else if(gallery.selection_status==="submitted"&&gallery.revision_allowed)$("draftSyncStatus").textContent="Akses revisi dibuka oleh admin. Setelah dikirim, galeri akan terkunci kembali.";
+ }
 }
 function openReview(){
  renderReviewList();
@@ -120,7 +125,7 @@ function closeReview(){
 }
 function renderReviewList(){
  const chosen=photos.filter(p=>p.selected).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0));
- $("reviewSubtitle").textContent=gallery?.selection_status==="submitted"
+ $("reviewSubtitle").textContent=gallery?.selection_status==="submitted"&&!gallery?.revision_allowed
    ?"Pilihan sudah dikirim dan terkunci."
    :"Periksa kembali foto. Anda masih bisa membatalkan pilihan sebelum dikirim.";
  $("reviewFooterCount").textContent=`${chosen.length} foto dipilih`;
@@ -130,7 +135,7 @@ function renderReviewList(){
        onerror="if(this.dataset.driveId && !this.dataset.fallback){this.dataset.fallback='1';this.src='https://drive.google.com/uc?export=view&id='+encodeURIComponent(this.dataset.driveId)}else{this.style.opacity='.2'}"
        data-drive-id="${escapeHtml(p.drive_file_id||"")}">
      <div class="review-photo-meta"><b>${i+1}. ${escapeHtml(p.filename)}</b><small>Foto pilihan Anda</small></div>
-     ${gallery?.selection_status==="submitted"?"":`<button type="button" class="review-remove" data-remove-selection="${p.id}">Batalkan pilihan</button>`}
+     ${gallery?.selection_status==="submitted"&&!gallery?.revision_allowed?"":`<button type="button" class="review-remove" data-remove-selection="${p.id}">Batalkan pilihan</button>`}
    </article>`).join("") || '<div class="review-empty"><b>Belum ada foto pilihan.</b><span>Kembali ke galeri untuk memilih foto favorit Anda.</span></div>';
 }
 function openPreview(id){
@@ -141,7 +146,7 @@ function openPreview(id){
  previewImage.dataset.fallback="";
  previewImage.src=p.preview_url||"";$("previewName").textContent=p.filename;
  $("previewSelect").textContent=p.selected?"♥ Foto Terpilih":"♡ Pilih Foto";
- $("previewSelect").disabled=gallery.selection_status==="submitted";
+ $("previewSelect").disabled=gallery.selection_status==="submitted"&&!gallery.revision_allowed;
  $("previewSkip").textContent=swipeMode?"Lewati →":"Tutup foto";
  $("swipeHint").textContent=swipeMode?"Mode Swipe aktif · Geser kiri untuk melewati, kanan untuk memilih":"Gunakan tombol atau geser foto";
  $("previewModal").classList.add("open");
@@ -162,7 +167,7 @@ function advanceSwipe(){
 }
 function closePreview(){$("previewModal").classList.remove("open");swipeMode=false;}
 async function togglePhoto(id){
- if(gallery.selection_status==="submitted"){alert("Pilihan sudah dikirim. Hubungi admin jika perlu perubahan.");return;}
+ if(gallery.selection_status==="submitted" && !gallery.revision_allowed){alert("Pilihan sudah dikirim dan terkunci. Hubungi admin jika perlu revisi.");return;}
  if(gallery.selection_deadline && new Date().toISOString().slice(0,10)>gallery.selection_deadline){alert("Batas waktu pemilihan telah berakhir.");return;}
  const p=photos.find(x=>x.id===id);if(!p)return;
  if(!p.selected&&Number(gallery.selection_limit)>0&&selectedCount()>=Number(gallery.selection_limit)){alert(`Maksimal pilihan ${gallery.selection_limit} foto.`);return;}
@@ -225,7 +230,7 @@ $("submitSelection").addEventListener("click",async()=>{
  $("submitSelection").disabled=false;
  if(error){alert("Gagal mengirim pilihan: "+error.message);return;}
  if(!data?.ok){alert(data?.message||"Pilihan tidak dapat dikirim.");return;}
- gallery.selection_status="submitted";gallery.submitted_at=new Date().toISOString();
+ gallery.selection_status="submitted";gallery.submitted_at=new Date().toISOString();gallery.revision_allowed=false;
  draftDirty=false;clearTimeout(draftSaveTimer);
  setDraftStatus("Pilihan final sudah dikirim dan terkunci.");
  const admin=prompt("Pilih nomor WhatsApp admin:\n1. Admin 1 — 0858 0000 7878\n2. Admin 2 — 0823 2471 4989","1");
@@ -263,13 +268,15 @@ async function init(){
    return;
  }
  gallery=data.gallery;photos=(data.photos||[]).map(p=>({...p,selected:!!p.selected}));
- if(gallery.selection_status!=="submitted"){
+ if(gallery.selection_status!=="submitted" || gallery.revision_allowed){
   await loadSelectionDraft(false);
  }else{
   photos.forEach(p=>p.selected=!!p.selected);
  }
  $("clientGalleryTitle").textContent=gallery.gallery_name;
- $("clientGreeting").textContent=`Halo ${gallery.client_name}, silakan pilih foto untuk editing. Batas pemilihan: ${gallery.selection_deadline||"—"}.`;
+ $("clientGreeting").textContent=gallery.revision_allowed
+  ?`Halo ${gallery.client_name}, akses revisi dibuka oleh admin. Silakan perbarui pilihan foto.`
+  :`Halo ${gallery.client_name}, silakan pilih foto untuk editing. Batas pemilihan: ${gallery.selection_deadline||"—"}.`;
  $("galleryNotice").textContent=gallery.selection_status==="submitted"?"Pilihan Anda sudah dikirim. Terima kasih!":"Silakan pilih foto sesuai kuota yang tersedia.";
  render();
 }

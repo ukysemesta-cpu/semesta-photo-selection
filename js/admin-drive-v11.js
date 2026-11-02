@@ -195,6 +195,86 @@ async function togglePhotoHighlight(photoId, currentlyHighlighted) {
   }
 }
 
+
+async function loadAdminSelectionDraft() {
+  const list = $("adminDraftList");
+  const meta = $("adminDraftMeta");
+  const button = $("refreshAdminDraft");
+  if (!activePhotoGallery) return;
+  button.disabled = true;
+  meta.textContent = "Memuat pilihan sementara klien...";
+  list.innerHTML = '<div class="details-empty">Mengambil draft dari Supabase...</div>';
+  try {
+    const { data, error } = await sb.rpc("get_photo_selection_draft", {
+      p_token: activePhotoGallery.token
+    });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.message || "Draft tidak dapat dibaca.");
+    const revisionStatus = $("adminRevisionStatus");
+    if (activePhotoGallery.selectionStatus === "submitted" && !data.revision_allowed) {
+      meta.textContent = "Galeri sudah dikirim. Lihat hasil final pada Rekap Pilihan.";
+      list.innerHTML = '<div class="admin-draft-empty">Pilihan final sudah dikirim dan terkunci. Admin dapat membuka akses revisi jika diperlukan.</div>';
+      if (revisionStatus) revisionStatus.textContent = "Akses revisi terkunci.";
+      $("openClientRevision").disabled = false;
+      return;
+    }
+    if (data.revision_allowed) {
+      if (revisionStatus) revisionStatus.textContent = "Akses revisi sedang terbuka untuk klien.";
+      $("openClientRevision").disabled = true;
+    } else {
+      if (revisionStatus) revisionStatus.textContent = "Klien dapat menyimpan draft sebelum submit.";
+      $("openClientRevision").disabled = activePhotoGallery.selectionStatus !== "submitted";
+    }
+    const ids = Array.isArray(data.photo_ids) ? data.photo_ids : [];
+    meta.textContent = `${ids.length} foto sementara · diperbarui dari Supabase`;
+    if (!ids.length) {
+      list.innerHTML = '<div class="admin-draft-empty">Klien belum menyimpan pilihan sementara.</div>';
+      return;
+    }
+    const { data: photos, error: photoError } = await sb.from("photos")
+      .select("id,filename,preview_url,sort_order")
+      .eq("gallery_id", activePhotoGallery.id)
+      .in("id", ids)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+    if (photoError) throw photoError;
+    list.innerHTML = (photos || []).map((photo, index) => `
+      <article class="admin-draft-item">
+        <img src="${escapeHtml(photo.preview_url || "")}" alt="${escapeHtml(photo.filename)}" loading="lazy" onerror="this.style.display='none'">
+        <div><b>${index + 1}. ${escapeHtml(photo.filename)}</b><small>Draft pilihan klien · belum dikirim final</small></div>
+      </article>`).join("") || '<div class="admin-draft-empty">Foto draft tidak ditemukan. Mungkin foto sudah tidak aktif.</div>';
+  } catch (err) {
+    console.error("Load admin selection draft failed:", err);
+    meta.textContent = "Gagal memuat draft.";
+    list.innerHTML = `<div class="admin-draft-empty">Tidak dapat membaca draft: ${escapeHtml(err.message || "Kesalahan tidak diketahui")}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+
+async function openClientRevision() {
+  if (!activePhotoGallery) return;
+  const button = $("openClientRevision");
+  if (!confirm(`Buka akses revisi untuk ${activePhotoGallery.clientName}? Klien dapat mengubah pilihan satu kali. Setelah dikirim, galeri terkunci kembali.`)) return;
+  button.disabled = true;
+  try {
+    const { data, error } = await sb.rpc("open_gallery_revision", { p_gallery_id: activePhotoGallery.id });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.message || "Akses revisi tidak dapat dibuka.");
+    activePhotoGallery.selectionStatus = "submitted";
+    $("adminRevisionStatus").textContent = "Akses revisi sudah dibuka. Menunggu klien mengirim revisi.";
+    $("photoUploadStatus").textContent = "Akses revisi klien berhasil dibuka.";
+    await loadAdminSelectionDraft();
+    alert("Akses revisi berhasil dibuka. Klien dapat membuka tautan galeri yang sama.");
+  } catch (err) {
+    console.error("Open client revision failed:", err);
+    alert("Gagal membuka revisi: " + (err.message || "Kesalahan tidak diketahui"));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function managePhotos(g) {
   activePhotoGallery = g;
   if (!$("photoManagerModal") || !$("managedPhotoList") || !$("syncDriveButton")) {
@@ -208,6 +288,7 @@ async function managePhotos(g) {
   $("photoManagerModal").classList.add("open");
   $("photoManagerModal").setAttribute("aria-hidden", "false");
   await syncDrivePhotos(g, true);
+  await loadAdminSelectionDraft();
 }
 
 async function syncDrivePhotos(g, quiet = false) {
@@ -249,6 +330,8 @@ $("photoManagerModal")?.addEventListener("click", e => {
 $("syncDriveButton")?.addEventListener("click", () => {
   if (activePhotoGallery) syncDrivePhotos(activePhotoGallery, false);
 });
+$("refreshAdminDraft")?.addEventListener("click", loadAdminSelectionDraft);
+$("openClientRevision")?.addEventListener("click", openClientRevision);
 
 $("managedPhotoList")?.addEventListener("click", event => {
   const button = event.target.closest("[data-highlight-photo]");
