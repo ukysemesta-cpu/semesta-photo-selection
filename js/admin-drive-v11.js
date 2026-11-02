@@ -52,9 +52,28 @@ function clientGalleryUrl(g) {
 function clientProgressUrl(g) {
   return new URL(`progress.html?token=${encodeURIComponent(g.token)}`, window.location.href).href;
 }
+function clientGalleryInviteMessage(g) {
+  const name = String(g.clientName || "Kak").trim() || "Kak";
+  const link = clientGalleryUrl(g);
+  return `Hallo Kak ${name},
+
+Silahkan pilih file yang mau kami editkan ya. Klik tombol pilih ❤️ dan berhenti saat sudah tidak bisa diklik lagi. Setelah itu, jangan lupa pencet tombol kirim yang akan langsung menuju WhatsApp kami.
+
+Link Galeri:
+${link}`;
+}
 async function copyText(value) {
-  try { await navigator.clipboard.writeText(value); alert("Link berhasil disalin:\n"+value); }
-  catch { window.prompt("Salin link berikut:", value); }
+  try { await navigator.clipboard.writeText(value); alert("Teks berhasil disalin:\n"+value); }
+  catch { window.prompt("Salin teks berikut:", value); }
+}
+async function copyGalleryInvite(g) {
+  const message = clientGalleryInviteMessage(g);
+  try {
+    await navigator.clipboard.writeText(message);
+    alert("Pesan instruksi dan link galeri berhasil disalin. Silakan kirimkan kepada klien melalui WhatsApp.");
+  } catch {
+    window.prompt("Salin pesan WhatsApp berikut:", message);
+  }
 }
 function isSubmitted(g){return g.selectionStatus==="submitted";}
 function isPending(g){return g.galleryStatus==="active"&&!isSubmitted(g);}
@@ -390,7 +409,7 @@ async function copyChosenOriToEdit(g){
 
 $("galleryTable").addEventListener("click",async event=>{
   const t=event.target;
-  if(t.closest("[data-copy]")){const g=galleries.find(x=>x.id===t.closest("[data-copy]").dataset.copy);if(g)copyText(clientGalleryUrl(g));return;}
+  if(t.closest("[data-copy]")){const g=galleries.find(x=>x.id===t.closest("[data-copy]").dataset.copy);if(g)copyGalleryInvite(g);return;}
   if(t.closest("[data-progress-link]")){const g=galleries.find(x=>x.id===t.closest("[data-progress-link]").dataset.progressLink);if(g)copyText(clientProgressUrl(g));return;}
   if(t.closest("[data-photos]")){const g=galleries.find(x=>x.id===t.closest("[data-photos]").dataset.photos);if(g)managePhotos(g);return;}
   if(t.closest("[data-edit]")){const g=galleries.find(x=>x.id===t.closest("[data-edit]").dataset.edit);if(!g)return;
