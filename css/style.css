@@ -338,3 +338,10 @@ body{background:#174b35;color:var(--ink)}
 .zoom-control .btn{width:100%;padding:9px;font-size:10px}
 .zoom-control .btn:disabled,.zoom-control input:disabled{opacity:.45;cursor:not-allowed}
 #collageCanvas{touch-action:none;user-select:none;-webkit-user-select:none}
+
+/* COLLAGE STUDIO FIX V4 — grid delete and undo/redo */
+.history-actions{display:flex;gap:7px;align-items:center}
+.history-actions .btn{padding:7px 12px;font-size:11px}
+.history-actions .btn:disabled{opacity:.38;cursor:not-allowed}
+#collageCanvas{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+#collageCanvas:active{cursor:grabbing}
