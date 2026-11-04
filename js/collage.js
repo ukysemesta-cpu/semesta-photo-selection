@@ -1,6 +1,52 @@
 const $ = id => document.getElementById(id);
 const canvas=$("collageCanvas"), ctx=canvas.getContext("2d");
 const state={format:"feed",background:"#ffffff",gap:12,photos:[],slots:[],selected:-1,drag:null};
+const history={undo:[],redo:[],limit:40,restoring:false};
+function snapshot(){
+ return {format:state.format,background:state.background,gap:state.gap,
+  photos:state.photos.slice(),slots:state.slots.map(s=>({...s})),selected:state.selected};
+}
+function refreshHistoryButtons(){
+ $("undoBtn").disabled=!history.undo.length;
+ $("redoBtn").disabled=!history.redo.length;
+}
+function pushSnapshot(entry){
+ if(history.restoring)return;
+ history.undo.push(entry);
+ if(history.undo.length>history.limit)history.undo.shift();
+ history.redo.length=0;
+ refreshHistoryButtons();
+}
+function saveHistory(){pushSnapshot(snapshot());}
+function restoreSnapshot(s){
+ history.restoring=true;
+ state.format=s.format;state.background=s.background;state.gap=s.gap;
+ state.photos=s.photos.slice();state.slots=s.slots.map(x=>({...x}));state.selected=s.selected;
+ const f=formats[state.format];canvas.width=f.w;canvas.height=f.h;
+ canvas.style.aspectRatio=`${f.w}/${f.h}`;
+ $("formatSelect").value=state.format;
+ $("gapRange").value=state.gap;$("gapValue").textContent=state.gap+" px";
+ $("customBackground").value=state.background;
+ document.querySelectorAll(".swatch").forEach(b=>b.classList.toggle("active",b.dataset.color===state.background));
+ $("canvasDimensions").textContent=`${f.w} × ${f.h} px · ${f.label}`;
+ history.restoring=false;draw();renderControls();refreshHistoryButtons();
+}
+function undo(){
+ if(!history.undo.length)return;
+ history.redo.push(snapshot());
+ const previous=history.undo.pop();restoreSnapshot(previous);
+}
+function redo(){
+ if(!history.redo.length)return;
+ history.undo.push(snapshot());
+ const next=history.redo.pop();restoreSnapshot(next);
+}
+$("undoBtn").addEventListener("click",undo);
+$("redoBtn").addEventListener("click",redo);
+window.addEventListener("keydown",e=>{
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();e.shiftKey?redo():undo();}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redo();}
+});
 const formats={feed:{w:1080,h:1350,label:"Instagram Feed"},story:{w:1080,h:1920,label:"Instagram Story"}};
 const templates=[
  {id:"auto",name:"Otomatis sesuai jumlah foto",layout:(n,w,h,g)=>gridLayout(n,w,h,g)},
@@ -46,6 +92,13 @@ function draw(showSelection=true){
   const dx=slot.x+(slot.w-dw)/2+(slot.ox||0),dy=slot.y+(slot.h-dh)/2+(slot.oy||0);
   ctx.drawImage(img,dx,dy,dw,dh);ctx.restore();
   if(showSelection && i===state.selected){ctx.save();ctx.strokeStyle="#e6d78d";ctx.lineWidth=8;ctx.strokeRect(slot.x+4,slot.y+4,slot.w-8,slot.h-8);ctx.restore();}
+  if(showSelection){
+   const r=Math.max(22,Math.min(34,slot.w*.11)),cx=slot.x+slot.w-r*.68,cy=slot.y+r*.68;
+   ctx.save();ctx.beginPath();ctx.arc(cx,cy,r*.52,0,Math.PI*2);ctx.fillStyle="rgba(180,35,45,.94)";ctx.fill();
+   ctx.strokeStyle="#fff";ctx.lineWidth=Math.max(2,r*.09);ctx.lineCap="round";
+   ctx.beginPath();ctx.moveTo(cx-r*.18,cy-r*.18);ctx.lineTo(cx+r*.18,cy+r*.18);
+   ctx.moveTo(cx+r*.18,cy-r*.18);ctx.lineTo(cx-r*.18,cy+r*.18);ctx.stroke();ctx.restore();
+  }
  });
  $("canvasStatus").textContent=state.photos.length?`${state.photos.length} foto · ${state.selected>=0?"Foto "+(state.selected+1)+" dipilih":"Pilih foto pada preview"}`:"Tambahkan foto untuk mulai membuat kolase.";
 }
@@ -65,15 +118,26 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":
 $("templateSelect").innerHTML=templates.map(t=>`<option value="${t.id}">${t.name}</option>`).join("");
 $("photoInput").addEventListener("change",async e=>{
  const files=[...e.target.files].filter(f=>f.type.startsWith("image/"));
+ if(files.length)saveHistory();
  for(const file of files){const url=URL.createObjectURL(file),img=new Image();img.src=url;await img.decode();state.photos.push({name:file.name,file,img,url});}
  e.target.value="";resetSlots();
 });
+function removePhotoAt(i){
+ if(i<0||i>=state.photos.length)return;
+ saveHistory();
+ const removed=state.photos[i];
+ if(removed?.url)URL.revokeObjectURL(removed.url);
+ state.photos.splice(i,1);
+ resetSlots();
+}
 $("photoList").addEventListener("click",e=>{
  const item=e.target.closest("[data-photo]");if(!item)return;const i=Number(item.dataset.photo);
- if(e.target.tagName==="SMALL"){URL.revokeObjectURL(state.photos[i].url);state.photos.splice(i,1);resetSlots();return;}
+ if(e.target.tagName==="SMALL"){removePhotoAt(i);return;}
  state.selected=i;draw();renderControls();
 });
 $("selectedPhoto").addEventListener("change",e=>{state.selected=Number(e.target.value);draw();renderControls()});
+$("zoomRange").addEventListener("pointerdown",()=>saveHistory());
+$("zoomRange").addEventListener("keydown",e=>{if(["ArrowLeft","ArrowRight","Home","End"].includes(e.key))saveHistory()});
 $("zoomRange").addEventListener("input",e=>{
  if(state.selected<0)return;
  const slot=state.slots[state.selected];if(!slot)return;
@@ -81,50 +145,52 @@ $("zoomRange").addEventListener("input",e=>{
  $("zoomValue").textContent=`${Math.round(slot.scale*100)}%`;
  draw();
 });
-$("resetPhotoPosition").addEventListener("click",()=>{
+$("resetPhotoPosition").addEventListener("click",()=>{saveHistory();
  if(state.selected<0)return;
  const slot=state.slots[state.selected];if(!slot)return;
  slot.scale=1;slot.ox=0;slot.oy=0;renderControls();draw();
 });
-$("formatSelect").addEventListener("change",e=>{state.format=e.target.value;const f=formats[state.format];canvas.width=f.w;canvas.height=f.h;canvas.style.aspectRatio=`${f.w}/${f.h}`;$("canvasDimensions").textContent=`${f.w} × ${f.h} px · ${f.label}`;resetSlots()});
-$("templateSelect").addEventListener("change",resetSlots);
-$("gapRange").addEventListener("input",e=>{state.gap=Number(e.target.value);$("gapValue").textContent=state.gap+" px";resetSlots()});
-document.querySelectorAll(".swatch").forEach(b=>b.addEventListener("click",()=>{state.background=b.dataset.color;document.querySelectorAll(".swatch").forEach(x=>x.classList.toggle("active",x===b));$("customBackground").value=state.background;draw()}));
+$("formatSelect").addEventListener("change",e=>{saveHistory();state.format=e.target.value;const f=formats[state.format];canvas.width=f.w;canvas.height=f.h;canvas.style.aspectRatio=`${f.w}/${f.h}`;$("canvasDimensions").textContent=`${f.w} × ${f.h} px · ${f.label}`;resetSlots()});
+$("templateSelect").addEventListener("change",()=>{saveHistory();resetSlots()});
+$("gapRange").addEventListener("pointerdown",()=>saveHistory());
+$("gapRange").addEventListener("change",e=>{state.gap=Number(e.target.value);$("gapValue").textContent=state.gap+" px";resetSlots()});
+document.querySelectorAll(".swatch").forEach(b=>b.addEventListener("click",()=>{saveHistory();state.background=b.dataset.color;document.querySelectorAll(".swatch").forEach(x=>x.classList.toggle("active",x===b));$("customBackground").value=state.background;draw()}));
+$("customBackground").addEventListener("pointerdown",()=>saveHistory());
 $("customBackground").addEventListener("input",e=>{state.background=e.target.value;document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("active"));draw()});
-function reorder(direction){if(state.selected<0)return;const j=state.selected+direction;if(j<0||j>=state.photos.length)return;[state.photos[state.selected],state.photos[j]]=[state.photos[j],state.photos[state.selected]];state.selected=j;resetSlots()}
+function reorder(direction){if(state.selected<0)return;saveHistory();const j=state.selected+direction;if(j<0||j>=state.photos.length)return;[state.photos[state.selected],state.photos[j]]=[state.photos[j],state.photos[state.selected]];state.selected=j;resetSlots()}
 $("moveUp").addEventListener("click",()=>reorder(-1));$("moveDown").addEventListener("click",()=>reorder(1));
-$("removePhoto").addEventListener("click",()=>{if(state.selected<0)return;URL.revokeObjectURL(state.photos[state.selected].url);state.photos.splice(state.selected,1);resetSlots()});
+$("removePhoto").addEventListener("click",()=>removePhotoAt(state.selected));
 function canvasPoint(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
 function hitTest(p){for(let i=state.slots.length-1;i>=0;i--){const s=state.slots[i];if(p.x>=s.x&&p.x<=s.x+s.w&&p.y>=s.y&&p.y<=s.y+s.h)return i;}return -1}
 canvas.addEventListener("pointerdown",e=>{
  const p=canvasPoint(e),i=hitTest(p);if(i<0)return;
+ const slot=state.slots[i],r=Math.max(22,Math.min(34,slot.w*.11)),cx=slot.x+slot.w-r*.68,cy=slot.y+r*.68;
+ if(Math.hypot(p.x-cx,p.y-cy)<r*.65){removePhotoAt(i);return;}
  state.selected=i;
- state.drag={i,startX:p.x,startY:p.y,x:p.x,y:p.y,ox:state.slots[i].ox||0,oy:state.slots[i].oy||0,moved:false};
+ state.drag={i,startX:p.x,startY:p.y,x:p.x,y:p.y,ox:slot.ox||0,oy:slot.oy||0,moved:false,before:snapshot()};
  canvas.setPointerCapture(e.pointerId);
  draw();renderControls();
 });
 canvas.addEventListener("pointermove",e=>{
  if(!state.drag)return;
  const p=canvasPoint(e),d=state.drag,s=state.slots[d.i];
- const dx=p.x-d.x,dy=p.y-d.y;
  if(Math.abs(p.x-d.startX)+Math.abs(p.y-d.startY)>8)d.moved=true;
- // Keep moving the crop while the pointer is inside the selected cell.
- // If released over another cell, the two photos exchange grid positions.
- if(hitTest(p)===d.i){
-  s.ox=d.ox+(p.x-d.startX);s.oy=d.oy+(p.y-d.startY);
- }
+ if(hitTest(p)===d.i){s.ox=d.ox+(p.x-d.startX);s.oy=d.oy+(p.y-d.startY);}
  draw();
 });
 function finishCanvasDrag(e){
  if(!state.drag)return;
  const d=state.drag,p=canvasPoint(e),target=hitTest(p);
- if(d.moved && target>=0 && target!==d.i){
-  [state.photos[d.i],state.photos[target]]=[state.photos[target],state.photos[d.i]];
-  state.selected=target;
-  $("canvasStatus").textContent=`Posisi foto ditukar: Foto ${d.i+1} ↔ Foto ${target+1}`;
+ if(d.moved){
+  pushSnapshot(d.before);
+  if(target>=0&&target!==d.i){
+   [state.photos[d.i],state.photos[target]]=[state.photos[target],state.photos[d.i]];
+   state.selected=target;
+  }else{
+   const slot=state.slots[d.i];slot.ox=(slot.ox||0);slot.oy=(slot.oy||0);
+  }
  }
- state.drag=null;
- draw();renderControls();
+ state.drag=null;draw();renderControls();
 }
 canvas.addEventListener("pointerup",finishCanvasDrag);
 canvas.addEventListener("pointercancel",()=>{state.drag=null;draw()});
