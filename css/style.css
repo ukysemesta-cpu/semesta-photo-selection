@@ -345,3 +345,6 @@ body{background:#174b35;color:var(--ink)}
 .history-actions .btn:disabled{opacity:.38;cursor:not-allowed}
 #collageCanvas{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
 #collageCanvas:active{cursor:grabbing}
+
+/* COLLAGE STUDIO FIX V5 — manual grid column layout */
+#gridColumns{width:100%}
