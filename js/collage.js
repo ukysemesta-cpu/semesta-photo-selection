@@ -9,8 +9,16 @@ const templates=[
  {id:"equal",name:"Grid seragam",layout:(n,w,h,g)=>gridLayout(n,w,h,g)}
 ];
 function gridLayout(n,w,h,g){
- if(!n)return[]; const cols=n===1?1:n===2?2:n<=4?2:3, rows=Math.ceil(n/cols), cellW=(w-g*(cols+1))/cols,cellH=(h-g*(rows+1))/rows;
- return Array.from({length:n},(_,i)=>({x:g+(i%cols)*(cellW+g),y:g+Math.floor(i/cols)*(cellH+g),w:cellW,h:cellH,scale:1,ox:0,oy:0}));
+ if(!n)return[];
+ const cols=n===1?1:n===2?2:n<=4?2:n<=9?3:n<=16?4:5;
+ const rows=Math.ceil(n/cols);
+ const cellW=(w-g*(cols+1))/cols;
+ const cellH=(h-g*(rows+1))/rows;
+ return Array.from({length:n},(_,i)=>({
+  x:g+(i%cols)*(cellW+g),
+  y:g+Math.floor(i/cols)*(cellH+g),
+  w:cellW,h:cellH,scale:1,ox:0,oy:0
+ }));
 }
 function heroLayout(n,w,h,g){
  if(n<2)return gridLayout(n,w,h,g);
@@ -46,10 +54,12 @@ function renderControls(){
  $("photoList").innerHTML=state.photos.length?state.photos.map((p,i)=>`<button class="photo-list-item ${i===state.selected?"active":""}" data-photo="${i}"><span>${i+1}</span><b title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</b><small>×</small></button>`).join(""):'<div class="tool-empty">Belum ada foto. Tambahkan foto dari komputer.</div>';
  $("selectedPhoto").innerHTML='<option value="">Pilih foto</option>'+state.photos.map((p,i)=>`<option value="${i}" ${i===state.selected?"selected":""}>${i+1}. ${escapeHtml(p.name)}</option>`).join("");
  const slot=state.selected>=0?state.slots[state.selected]:null;
- $("zoomRange").disabled=!slot;
- $("resetPhotoPosition").disabled=!slot;
- $("zoomRange").value=slot?(slot.scale||1):1;
- $("zoomValue").textContent=`${Math.round((slot?.scale||1)*100)}%`;
+ if($("zoomRange")){
+  $("zoomRange").disabled=!slot;
+  $("resetPhotoPosition").disabled=!slot;
+  $("zoomRange").value=slot?(slot.scale||1):1;
+  $("zoomValue").textContent=`${Math.round((slot?.scale||1)*100)}%`;
+ }
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 $("templateSelect").innerHTML=templates.map(t=>`<option value="${t.id}">${t.name}</option>`).join("");
@@ -86,9 +96,38 @@ $("moveUp").addEventListener("click",()=>reorder(-1));$("moveDown").addEventList
 $("removePhoto").addEventListener("click",()=>{if(state.selected<0)return;URL.revokeObjectURL(state.photos[state.selected].url);state.photos.splice(state.selected,1);resetSlots()});
 function canvasPoint(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
 function hitTest(p){for(let i=state.slots.length-1;i>=0;i--){const s=state.slots[i];if(p.x>=s.x&&p.x<=s.x+s.w&&p.y>=s.y&&p.y<=s.y+s.h)return i;}return -1}
-canvas.addEventListener("pointerdown",e=>{const p=canvasPoint(e),i=hitTest(p);if(i<0)return;state.selected=i;state.drag={i,x:p.x,y:p.y,ox:state.slots[i].ox||0,oy:state.slots[i].oy||0};canvas.setPointerCapture(e.pointerId);draw();renderControls()});
-canvas.addEventListener("pointermove",e=>{if(!state.drag)return;const p=canvasPoint(e),d=state.drag,s=state.slots[d.i];s.ox=d.ox+(p.x-d.x);s.oy=d.oy+(p.y-d.y);draw()});
-canvas.addEventListener("pointerup",()=>state.drag=null);canvas.addEventListener("pointercancel",()=>state.drag=null);
+canvas.addEventListener("pointerdown",e=>{
+ const p=canvasPoint(e),i=hitTest(p);if(i<0)return;
+ state.selected=i;
+ state.drag={i,startX:p.x,startY:p.y,x:p.x,y:p.y,ox:state.slots[i].ox||0,oy:state.slots[i].oy||0,moved:false};
+ canvas.setPointerCapture(e.pointerId);
+ draw();renderControls();
+});
+canvas.addEventListener("pointermove",e=>{
+ if(!state.drag)return;
+ const p=canvasPoint(e),d=state.drag,s=state.slots[d.i];
+ const dx=p.x-d.x,dy=p.y-d.y;
+ if(Math.abs(p.x-d.startX)+Math.abs(p.y-d.startY)>8)d.moved=true;
+ // Keep moving the crop while the pointer is inside the selected cell.
+ // If released over another cell, the two photos exchange grid positions.
+ if(hitTest(p)===d.i){
+  s.ox=d.ox+(p.x-d.startX);s.oy=d.oy+(p.y-d.startY);
+ }
+ draw();
+});
+function finishCanvasDrag(e){
+ if(!state.drag)return;
+ const d=state.drag,p=canvasPoint(e),target=hitTest(p);
+ if(d.moved && target>=0 && target!==d.i){
+  [state.photos[d.i],state.photos[target]]=[state.photos[target],state.photos[d.i]];
+  state.selected=target;
+  $("canvasStatus").textContent=`Posisi foto ditukar: Foto ${d.i+1} ↔ Foto ${target+1}`;
+ }
+ state.drag=null;
+ draw();renderControls();
+}
+canvas.addEventListener("pointerup",finishCanvasDrag);
+canvas.addEventListener("pointercancel",()=>{state.drag=null;draw()});
 function exportCanvas(type){
  if(!state.photos.length){alert("Tambahkan foto terlebih dahulu.");return;}
  draw(false);
