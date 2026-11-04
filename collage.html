@@ -50,6 +50,12 @@
         <button class="btn btn-ghost" id="removePhoto">Hapus foto</button>
       </div>
       <div class="tool-help">Tip: klik foto pada preview untuk memilihnya. Tarik foto untuk menggeser crop/posisi. Template dapat diganti kapan saja.</div>
+      <div class="zoom-control">
+        <label class="tool-label" for="zoomRange">Zoom foto <span id="zoomValue">100%</span></label>
+        <input type="range" id="zoomRange" min="1" max="3" step="0.05" value="1" disabled>
+        <button class="btn btn-ghost" id="resetPhotoPosition" type="button" disabled>Reset posisi &amp; zoom</button>
+        <div class="tool-help">Pilih foto, lalu atur zoom dengan slider atau geser langsung pada preview.</div>
+      </div>
     </section>
   </aside>
   <section class="collage-workspace">
@@ -58,5 +64,5 @@
     <div class="workspace-footer"><span id="canvasStatus">Tambahkan foto untuk mulai membuat kolase.</span><span>Export resolusi penuh · 300 DPI-ready pixel dimensions</span></div>
   </section>
 </main>
-<script src="js/collage.js"></script>
+<script src="js/collage.js?v=20261104-collage-fix-v2"></script>
 </body></html>
