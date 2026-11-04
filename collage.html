@@ -20,7 +20,16 @@
       <select id="formatSelect"><option value="feed">Instagram Feed Portrait · 1080 × 1350</option><option value="story">Instagram Story · 1080 × 1920</option></select>
       <label class="tool-label" for="templateSelect">Template layout</label>
       <select id="templateSelect"></select>
-      <div class="tool-help">Pilih template otomatis, lalu geser foto pada kanvas untuk mengatur posisi secara manual.</div>
+      <label class="tool-label" for="gridColumns">Jumlah kolom (kiri ke kanan)</label>
+      <select id="gridColumns">
+        <option value="0">Otomatis</option>
+        <option value="2">2 kolom</option>
+        <option value="3">3 kolom</option>
+        <option value="4">4 kolom</option>
+        <option value="5">5 kolom</option>
+        <option value="6">6 kolom</option>
+      </select>
+      <div class="tool-help">Atur jumlah kolom horizontal. Jumlah baris vertikal akan menyesuaikan jumlah foto. Contoh 12 foto: pilih 3 kolom untuk 4 baris, atau 4 kolom untuk 3 baris.</div>
     </section>
     <section class="tool-section">
       <div class="tool-section-head"><b>Foto</b><span id="photoCounter">0 foto</span></div>
@@ -64,5 +73,5 @@
     <div class="workspace-footer"><span id="canvasStatus">Tambahkan foto untuk mulai membuat kolase.</span><span>Export resolusi penuh · 300 DPI-ready pixel dimensions</span></div>
   </section>
 </main>
-<script src="js/collage.js?v=20261104-collage-fix-v4"></script>
+<script src="js/collage.js?v=20261104-collage-layout-v5"></script>
 </body></html>
