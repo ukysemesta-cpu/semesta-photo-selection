@@ -348,3 +348,7 @@ body{background:#174b35;color:var(--ink)}
 
 /* COLLAGE STUDIO FIX V5 — manual grid column layout */
 #gridColumns{width:100%}
+
+/* COLLAGE STUDIO FIX V6 — stable grid frames during photo moves */
+#collageCanvas{cursor:grab}
+#collageCanvas:active{cursor:grabbing}
