@@ -1,9 +1,9 @@
 const $ = id => document.getElementById(id);
 const canvas=$("collageCanvas"), ctx=canvas.getContext("2d");
-const state={format:"feed",background:"#ffffff",gap:12,photos:[],slots:[],selected:-1,drag:null};
+const state={format:"feed",background:"#ffffff",gap:12,gridCols:0,photos:[],slots:[],selected:-1,drag:null};
 const history={undo:[],redo:[],limit:40,restoring:false};
 function snapshot(){
- return {format:state.format,background:state.background,gap:state.gap,
+ return {format:state.format,background:state.background,gap:state.gap,gridCols:state.gridCols,
   photos:state.photos.slice(),slots:state.slots.map(s=>({...s})),selected:state.selected};
 }
 function refreshHistoryButtons(){
@@ -20,12 +20,13 @@ function pushSnapshot(entry){
 function saveHistory(){pushSnapshot(snapshot());}
 function restoreSnapshot(s){
  history.restoring=true;
- state.format=s.format;state.background=s.background;state.gap=s.gap;
+ state.format=s.format;state.background=s.background;state.gap=s.gap;state.gridCols=s.gridCols||0;
  state.photos=s.photos.slice();state.slots=s.slots.map(x=>({...x}));state.selected=s.selected;
  const f=formats[state.format];canvas.width=f.w;canvas.height=f.h;
  canvas.style.aspectRatio=`${f.w}/${f.h}`;
  $("formatSelect").value=state.format;
  $("gapRange").value=state.gap;$("gapValue").textContent=state.gap+" px";
+ $("gridColumns").value=String(state.gridCols);
  $("customBackground").value=state.background;
  document.querySelectorAll(".swatch").forEach(b=>b.classList.toggle("active",b.dataset.color===state.background));
  $("canvasDimensions").textContent=`${f.w} × ${f.h} px · ${f.label}`;
@@ -56,7 +57,8 @@ const templates=[
 ];
 function gridLayout(n,w,h,g){
  if(!n)return[];
- const cols=n===1?1:n===2?2:n<=4?2:n<=9?3:n<=16?4:5;
+ const autoCols=n===1?1:n===2?2:n<=4?2:n<=9?3:n<=16?4:5;
+ const cols=Math.max(1,Math.min(n,state.gridCols||autoCols));
  const rows=Math.ceil(n/cols);
  const cellW=(w-g*(cols+1))/cols;
  const cellH=(h-g*(rows+1))/rows;
@@ -152,6 +154,13 @@ $("resetPhotoPosition").addEventListener("click",()=>{saveHistory();
 });
 $("formatSelect").addEventListener("change",e=>{saveHistory();state.format=e.target.value;const f=formats[state.format];canvas.width=f.w;canvas.height=f.h;canvas.style.aspectRatio=`${f.w}/${f.h}`;$("canvasDimensions").textContent=`${f.w} × ${f.h} px · ${f.label}`;resetSlots()});
 $("templateSelect").addEventListener("change",()=>{saveHistory();resetSlots()});
+$("gridColumns").addEventListener("change",e=>{
+ saveHistory();
+ state.gridCols=Number(e.target.value)||0;
+ const isGrid=["auto","equal"].includes($("templateSelect").value);
+ if(!isGrid)$("templateSelect").value="equal";
+ resetSlots();
+});
 $("gapRange").addEventListener("pointerdown",()=>saveHistory());
 $("gapRange").addEventListener("change",e=>{state.gap=Number(e.target.value);$("gapValue").textContent=state.gap+" px";resetSlots()});
 document.querySelectorAll(".swatch").forEach(b=>b.addEventListener("click",()=>{saveHistory();state.background=b.dataset.color;document.querySelectorAll(".swatch").forEach(x=>x.classList.toggle("active",x===b));$("customBackground").value=state.background;draw()}));
