@@ -176,15 +176,28 @@ canvas.addEventListener("pointerdown",e=>{
  const slot=state.slots[i],r=Math.max(22,Math.min(34,slot.w*.11)),cx=slot.x+slot.w-r*.68,cy=slot.y+r*.68;
  if(Math.hypot(p.x-cx,p.y-cy)<r*.65){removePhotoAt(i);return;}
  state.selected=i;
- state.drag={i,startX:p.x,startY:p.y,x:p.x,y:p.y,ox:slot.ox||0,oy:slot.oy||0,moved:false,before:snapshot()};
+ state.drag={
+  i,startX:p.x,startY:p.y,lastX:p.x,lastY:p.y,
+  ox:slot.ox||0,oy:slot.oy||0,
+  before:snapshot(),moved:false,crossedFrame:false
+ };
  canvas.setPointerCapture(e.pointerId);
  draw();renderControls();
 });
 canvas.addEventListener("pointermove",e=>{
  if(!state.drag)return;
- const p=canvasPoint(e),d=state.drag,s=state.slots[d.i];
+ const p=canvasPoint(e),d=state.drag,s=state.slots[d.i],over=hitTest(p);
  if(Math.abs(p.x-d.startX)+Math.abs(p.y-d.startY)>8)d.moved=true;
- if(hitTest(p)===d.i){s.ox=d.ox+(p.x-d.startX);s.oy=d.oy+(p.y-d.startY);}
+
+ // Once pointer enters another cell, treat the gesture as a frame move,
+ // not as crop adjustment. This keeps the source image framing unchanged.
+ if(over>=0 && over!==d.i)d.crossedFrame=true;
+
+ if(!d.crossedFrame && over===d.i){
+  s.ox=d.ox+(p.x-d.startX);
+  s.oy=d.oy+(p.y-d.startY);
+ }
+ d.lastX=p.x;d.lastY=p.y;
  draw();
 });
 function finishCanvasDrag(e){
@@ -192,17 +205,33 @@ function finishCanvasDrag(e){
  const d=state.drag,p=canvasPoint(e),target=hitTest(p);
  if(d.moved){
   pushSnapshot(d.before);
-  if(target>=0&&target!==d.i){
+  if(target>=0 && target!==d.i){
+   // Restore source crop first; swap the photos AND their crop/zoom data,
+   // while leaving each grid frame's geometry exactly where it is.
+   const sourceSlot=state.slots[d.i],targetSlot=state.slots[target];
+   sourceSlot.ox=d.ox;sourceSlot.oy=d.oy;
+   const cropA={scale:sourceSlot.scale||1,ox:sourceSlot.ox||0,oy:sourceSlot.oy||0};
+   const cropB={scale:targetSlot.scale||1,ox:targetSlot.ox||0,oy:targetSlot.oy||0};
    [state.photos[d.i],state.photos[target]]=[state.photos[target],state.photos[d.i]];
+   Object.assign(sourceSlot,cropB);
+   Object.assign(targetSlot,cropA);
    state.selected=target;
-  }else{
-   const slot=state.slots[d.i];slot.ox=(slot.ox||0);slot.oy=(slot.oy||0);
+   $("canvasStatus").textContent=`Foto dipindahkan ke frame ${target+1}. Susunan grid tetap.`;
+  } else {
+   // Drag within the same frame changes only the crop of that photo.
+   state.selected=d.i;
   }
  }
  state.drag=null;draw();renderControls();
 }
 canvas.addEventListener("pointerup",finishCanvasDrag);
-canvas.addEventListener("pointercancel",()=>{state.drag=null;draw()});
+canvas.addEventListener("pointercancel",()=>{
+ if(state.drag){
+  const d=state.drag,s=state.slots[d.i];
+  s.ox=d.ox;s.oy=d.oy;
+  state.drag=null;draw();renderControls();
+ }
+});
 function exportCanvas(type){
  if(!state.photos.length){alert("Tambahkan foto terlebih dahulu.");return;}
  draw(false);
