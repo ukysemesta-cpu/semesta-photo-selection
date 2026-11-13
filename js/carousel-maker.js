@@ -16,6 +16,10 @@ const settings=()=>({
  fit:$("carouselFit").value,background:$("carouselBackground").value,
  width:Number($("carouselQuality").value),height:Number($("carouselQuality").value)*1.25
 });
+function gridSettings(){return [0,1,2,3].map(i=>({transition:$(`g${i+1}Transition`).value,duration:Number($(`g${i+1}Duration`).value),transitionDuration:Number($(`g${i+1}TransitionDuration`).value),delay:Number($(`g${i+1}Delay`).value)}));}
+function gridPhotoList(grid){return photos.filter((_,i)=>i%4===grid);}
+function gridCycleDuration(g,grid){const n=gridPhotoList(grid).length;return n?n*(g.duration+g.transitionDuration)+g.delay:0;}
+function gridAnimationTotal(){return Math.max(...gridSettings().map((g,i)=>gridCycleDuration(g,i)),0);}
 function setStatus(msg){$("carouselExportStatus").textContent=msg;}
 function stopPreview(){
  if(previewRaf)cancelAnimationFrame(previewRaf);
@@ -68,34 +72,48 @@ function drawFeed(index,animated=false,elapsed=0,s=settings()){
  }else{
    const gap=Math.round(w*.012),pad=Math.round(w*.012),cw=(w-pad*2-gap)/2,ch=(h-pad*2-gap)/2;
    const positions=[[pad,pad],[pad+cw+gap,pad],[pad,pad+ch+gap],[pad+cw+gap,pad+ch+gap]];
-   const start=active*4;
+   const gs=gridSettings(),start=active*4;
    for(let k=0;k<4;k++){
-     const photo=photos[start+k];if(!photo)continue;
      const [x,y]=positions[k];
-     let reveal=1;
      if(animated){
-       const per=Math.max(.35,s.duration/4);
-       reveal=Math.max(0,Math.min(1,(elapsed-k*per)/Math.min(s.transitionDuration,per)));
+       const list=gridPhotoList(k);
+       if(list.length)drawIndependentGridCell(list,k,x,y,cw,ch,elapsed,gs[k],s.fit);
+     }else{
+       const photo=photos[start+k];
+       if(photo)drawPhotoCell(photo,x,y,cw,ch,s.fit);
      }
-     if(reveal>0){
-       ctx.save();
-       if(s.transition==="fade"||s.transition==="blur") {
-         if(s.transition==="blur")ctx.filter=`blur(${Math.round(10*(1-reveal))}px)`;
-         drawPhotoCell(photo,x,y,cw,ch,s.fit,reveal);
-       } else if(s.transition==="slide"){
-         ctx.beginPath();ctx.rect(x,y,cw*reveal,ch);ctx.clip();
-         drawPhotoCell(photo,x,y,cw,ch,s.fit,1);
-       } else if(s.transition==="zoom"){
-         drawPhotoCell(photo,x,y,cw,ch,s.fit,reveal,.82+.18*reveal);
-       } else {
-         drawPhotoCell(photo,x,y,cw,ch,s.fit,1,1+reveal*.07,Math.sin(reveal*Math.PI)*cw*.015);
-       }
-       ctx.restore();
-     }
-     ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=Math.max(2,w*.002);ctx.strokeRect(x,y,cw,ch);
+     ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=Math.max(2,w*.002);ctx.strokeRect(x,y,cw,ch);
    }
-   $("carouselSlideLabel").textContent=`Feed ${active+1} / ${count} · Foto ${Math.min(4,photos.length-start)} dari 4`;
+   $("carouselSlideLabel").textContent=animated?"Preview · Slideshow 4 grid independen":`Feed ${active+1} / ${count} · ${Math.min(4,photos.length-start)} foto`;
  }
+}
+function drawIndependentGridCell(list,grid,x,y,w,h,time,g,fit){
+ const local=time-g.delay;
+ if(local<0){drawPhotoCell(list[0],x,y,w,h,fit);return;}
+ const cycle=g.duration+g.transitionDuration;
+ const pos=local/cycle,index=Math.floor(pos)%list.length,phase=pos-Math.floor(pos);
+ const current=list[index],next=list[(index+1)%list.length];
+ const p=phase<g.duration/cycle?0:Math.min(1,(phase-g.duration/cycle)/(g.transitionDuration/cycle));
+ ctx.save();
+ if(p>0){
+  if(g.transition==="fade"||g.transition==="blur"){
+   drawPhotoCell(current,x,y,w,h,fit,1-p);
+   if(g.transition==="blur")ctx.filter=`blur(${Math.round(10*(1-p))}px)`;
+   drawPhotoCell(next,x,y,w,h,fit,p);
+  }else if(g.transition==="slide"){
+   drawPhotoCell(current,x,y,w,h,fit,1);
+   ctx.beginPath();ctx.rect(x,y,w*p,h);ctx.clip();drawPhotoCell(next,x,y,w,h,fit,1);
+  }else if(g.transition==="zoom"){
+   drawPhotoCell(current,x,y,w,h,fit,1,1+p*.16);drawPhotoCell(next,x,y,w,h,fit,p,.84+p*.16);
+  }else if(g.transition==="kenburns"){
+   drawPhotoCell(current,x,y,w,h,fit,1,1+phase*.08,Math.sin(phase*Math.PI)*w*.02);
+  }else{
+   drawPhotoCell(current,x,y,w,h,fit,1-p);ctx.filter=`blur(${Math.round(12*(1-p))}px)`;drawPhotoCell(next,x,y,w,h,fit,p);
+  }
+ }else{
+  drawPhotoCell(current,x,y,w,h,fit,1,g.transition==="kenburns"?1+phase*.08:1,g.transition==="kenburns"?Math.sin(phase*Math.PI)*w*.02:0);
+ }
+ ctx.restore();
 }
 function drawSlide(index){drawFeed(index,false,0,settings());renderList();}
 function renderList(){
@@ -134,7 +152,7 @@ $("carouselNext").addEventListener("click",()=>drawSlide((active+1)%Math.max(fee
 $("carouselPlayPreview").addEventListener("click",()=>{
  if(!photos.length||exporting){setStatus("Tambahkan foto terlebih dahulu untuk menjalankan preview.");return;}
  if(previewRaf){stopPreview();drawSlide(active);return;}
- const s=settings(),total=feedCount(s)*s.duration,started=performance.now();
+ const s=settings(),total=s.layout==="grid4"?gridAnimationTotal():feedCount(s)*s.duration,started=performance.now();
  const button=$("carouselPlayPreview");button.textContent="■ Hentikan Preview";
  button.setAttribute("aria-pressed","true");
  function tick(now){
@@ -143,14 +161,21 @@ $("carouselPlayPreview").addEventListener("click",()=>{
    if(elapsed>=total){stopPreview();button.setAttribute("aria-pressed","false");drawSlide(0);return;}
    const feedIndex=Math.min(feedCount(s)-1,Math.floor(elapsed/s.duration));
    const local=elapsed-feedIndex*s.duration;
-   if(s.layout==="grid4")drawFeed(feedIndex,true,local,s);
-   else drawVideoFrame(elapsed,s);
-   $("carouselSlideLabel").textContent=`Preview · ${s.layout==="grid4"?"Feed":"Slide"} ${feedIndex+1}/${feedCount(s)}`;
+   if(s.layout==="grid4"){drawFeed(0,true,elapsed,s);$("carouselSlideLabel").textContent="Preview · Slideshow 4 grid independen";}
+   else {drawVideoFrame(elapsed,s);$("carouselSlideLabel").textContent=`Preview · Slide ${feedIndex+1}/${feedCount(s)}`;}
    previewRaf=requestAnimationFrame(tick);
  }
  previewRaf=requestAnimationFrame(tick);
 });
-["carouselFit","carouselBackground","carouselQuality","carouselLayout"].forEach(id=>$(id).addEventListener("change",()=>{stopPreview();drawSlide(Math.min(active,feedCount()-1));}));
+function syncGridSettingsVisibility(){$("gridAnimationSettings").hidden=$("carouselLayout").value!=="grid4";}
+syncGridSettingsVisibility();
+["carouselFit","carouselBackground","carouselQuality","carouselLayout"].forEach(id=>$(id).addEventListener("change",()=>{stopPreview();syncGridSettingsVisibility();drawSlide(Math.min(active,feedCount()-1));}));
+[0,1,2,3].forEach(i=>{const n=i+1;
+ $(`g${n}Duration`).addEventListener("input",e=>$(`g${n}DurationValue`).textContent=`${Number(e.target.value).toFixed(1)} detik`);
+ $(`g${n}TransitionDuration`).addEventListener("input",e=>$(`g${n}TransitionDurationValue`).textContent=`${Number(e.target.value).toFixed(1)} detik`);
+ $(`g${n}Delay`).addEventListener("input",e=>$(`g${n}DelayValue`).textContent=`${Number(e.target.value).toFixed(2)} detik`);
+ [`g${n}Transition`,`g${n}Duration`,`g${n}TransitionDuration`,`g${n}Delay`].forEach(id=>$(id).addEventListener("change",()=>{stopPreview();drawSlide(active);}));
+});
 $("carouselDuration").addEventListener("input",e=>$("carouselDurationValue").textContent=`${e.target.value} detik`);
 $("carouselTransitionDuration").addEventListener("input",e=>$("carouselTransitionValue").textContent=`${Number(e.target.value).toFixed(1)} detik`);
 function canvasBlob(c){return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Gagal membuat gambar.")),"image/jpeg",.94));}
@@ -197,8 +222,8 @@ function drawTransitionFrame(from,to,progress,elapsed,transition,s){
 }
 function drawVideoFrame(time,s){
  const count=feedCount(s),total=count*s.duration;
+ if(s.layout==="grid4"){drawFeed(0,true,time,s);return gridAnimationTotal();}
  const index=Math.min(count-1,Math.floor(time/s.duration)),local=time-index*s.duration;
- if(s.layout==="grid4"){drawFeed(index,true,local,s);return total;}
  const next=(index+1)%count;
  if(local>s.duration-s.transitionDuration&&count>1){
   drawTransitionFrame(photos[index],photos[next],(local-(s.duration-s.transitionDuration))/s.transitionDuration,local,s.transition,s);
@@ -219,7 +244,7 @@ async function recordWebm(s){
  const chunks=[];recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
  const stopped=new Promise((resolve,reject)=>{recorder.onstop=()=>resolve(new Blob(chunks,{type:mime}));recorder.onerror=()=>reject(new Error("Perekaman video gagal."));});
  recorder.start(250);
- const total=feedCount(s)*s.duration,started=performance.now();
+ const total=s.layout==="grid4"?gridAnimationTotal():feedCount(s)*s.duration,started=performance.now();
  await new Promise(resolve=>{
   function frame(now){
    const t=Math.min(total,(now-started)/1000);drawVideoFrame(t,s);
@@ -235,7 +260,7 @@ async function recordWebm(s){
 $("exportCarouselMp4").addEventListener("click",async()=>{
  if(!photos.length||exporting)return;
  stopPreview();
- const s=settings(),duration=feedCount(s)*s.duration;
+ const s=settings(),duration=s.layout==="grid4"?gridAnimationTotal():feedCount(s)*s.duration;
  if(duration>20){setStatus(`Durasi total ${duration.toFixed(1)} detik. Maksimal 20 detik; kurangi durasi foto atau jumlah slide.`);return;}
  exporting=true;renderList();$("carouselProgress").hidden=false;$("carouselProgress").value=0;
  try{
