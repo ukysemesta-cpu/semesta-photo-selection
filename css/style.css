@@ -352,3 +352,29 @@ body{background:#174b35;color:var(--ink)}
 /* COLLAGE STUDIO FIX V6 — stable grid frames during photo moves */
 #collageCanvas{cursor:grab}
 #collageCanvas:active{cursor:grabbing}
+
+
+/* CAROUSEL MAKER V1 */
+.mode-switch.active{background:#174b38;color:#fff}
+#collageExportActions{display:flex;gap:8px;flex-wrap:wrap}
+.carousel-maker{min-height:calc(100vh - 76px);display:grid;grid-template-columns:330px minmax(0,1fr);background:#f5f8fb}
+.carousel-maker[hidden]{display:none!important}
+.carousel-controls{background:#fff;border-right:1px solid #dce7df;padding:22px 18px;overflow:auto;max-height:calc(100vh - 76px)}
+.carousel-workspace{padding:24px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.carousel-photo-list{display:grid;gap:7px;max-height:300px;overflow:auto;margin-top:10px}
+.carousel-photo-row{display:grid;grid-template-columns:44px minmax(0,1fr) 28px 28px 28px;align-items:center;gap:6px;padding:6px;border:1px solid #e4ebe5;border-radius:9px;background:#fff}
+.carousel-photo-row.active{border-color:#b7c98a;background:#fbfcf5}
+.carousel-photo-row img{width:44px;height:52px;object-fit:cover;border-radius:5px;background:#eef2ee}
+.carousel-photo-row b{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.carousel-photo-row button{border:1px solid #dfe7df;border-radius:6px;background:#f7faf7;min-height:27px;cursor:pointer;color:#315a43}
+.carousel-photo-row button:disabled{opacity:.3;cursor:not-allowed}
+.carousel-photo-row button[data-action=remove]{color:#a33b42}
+.carousel-controls input[type=range],.carousel-controls select{width:100%;margin:7px 0 12px}
+.carousel-controls input[type=color]{width:100%;height:35px;border:1px solid #dce7df;border-radius:7px;background:#fff}
+.carousel-controls .tool-section{display:grid;gap:7px}
+.carousel-controls .btn{width:100%;margin-top:6px}
+.carousel-preview-stage{flex:1;min-height:520px;display:flex;align-items:center;justify-content:center;overflow:auto;padding:18px;background-color:#e4eae5;background-image:linear-gradient(45deg,#d9e1db 25%,transparent 25%),linear-gradient(-45deg,#d9e1db 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d9e1db 75%),linear-gradient(-45deg,transparent 75%,#d9e1db 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0;border-radius:14px}
+#carouselCanvas{display:block;width:auto;height:auto;max-width:min(100%,650px);max-height:calc(100vh - 210px);aspect-ratio:4/5;box-shadow:0 12px 36px #172b3a24;background:#101810}
+#carouselProgress{width:100%;height:9px;accent-color:#174b38}
+@media(max-width:850px){.carousel-maker{grid-template-columns:290px minmax(0,1fr)}.carousel-controls{padding:16px 12px}.carousel-workspace{padding:16px}}
+@media(max-width:650px){.collage-top-actions{display:flex;flex-wrap:wrap;gap:6px}.collage-top-actions .quick-link,.collage-top-actions .btn{flex:1}.carousel-maker{display:flex;flex-direction:column}.carousel-controls{max-height:none;border-right:0;border-bottom:1px solid #dce7df}.carousel-workspace{padding:12px;min-height:550px}.carousel-preview-stage{min-height:440px;padding:10px}#carouselCanvas{max-height:560px;max-width:100%}.carousel-workspace .workspace-head{flex-wrap:wrap}}
