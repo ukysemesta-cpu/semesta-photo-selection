@@ -50,16 +50,16 @@ function loadImage(file){return new Promise((resolve,reject)=>{
  img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Gagal membaca "+file.name));};
  img.src=url;
 });}
-function fitImage(img,x,y,w,h,fit,alpha=1,scale=1,offsetX=0){
+function fitImage(img,x,y,w,h,fit,alpha=1,scale=1,offsetX=0,offsetY=0){
  const ratio=fit==="contain"?Math.min(w/img.width,h/img.height):Math.max(w/img.width,h/img.height);
  const dw=img.width*ratio*scale,dh=img.height*ratio*scale;
  ctx.save();ctx.globalAlpha=alpha;ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
- ctx.drawImage(img,x+(w-dw)/2+offsetX,y+(h-dh)/2,dw,dh);ctx.restore();
+ ctx.drawImage(img,x+(w-dw)/2+offsetX,y+(h-dh)/2+offsetY,dw,dh);ctx.restore();
 }
 function feedCount(s=settings()){return s.layout==="grid4"?Math.ceil(photos.length/4):photos.length;}
-function drawPhotoCell(photo,x,y,w,h,fit,alpha=1,scale=1,offsetX=0){
+function drawPhotoCell(photo,x,y,w,h,fit,alpha=1,scale=1,offsetX=0,offsetY=0){
  if(!photo)return;
- fitImage(photo.img,x,y,w,h,fit,alpha,scale,offsetX);
+ fitImage(photo.img,x,y,w,h,fit,alpha,scale,offsetX,offsetY);
 }
 function drawFeed(index,animated=false,elapsed=0,s=settings()){
  const w=canvas.width=s.width,h=canvas.height=s.height;
@@ -82,7 +82,6 @@ function drawFeed(index,animated=false,elapsed=0,s=settings()){
        const photo=photos[start+k];
        if(photo)drawPhotoCell(photo,x,y,cw,ch,s.fit);
      }
-     ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=Math.max(2,w*.002);ctx.strokeRect(x,y,cw,ch);
    }
    $("carouselSlideLabel").textContent=animated?"Preview · Slideshow 4 grid independen":`Feed ${active+1} / ${count} · ${Math.min(4,photos.length-start)} foto`;
  }
@@ -103,6 +102,13 @@ function drawIndependentGridCell(list,grid,x,y,w,h,time,g,fit){
   }else if(g.transition==="slide"){
    drawPhotoCell(current,x,y,w,h,fit,1);
    ctx.beginPath();ctx.rect(x,y,w*p,h);ctx.clip();drawPhotoCell(next,x,y,w,h,fit,1);
+  }else if(["drag-left","drag-right","drag-up","drag-down"].includes(g.transition)){
+   const dx=g.transition==="drag-left"?-p*w:g.transition==="drag-right"?p*w:0;
+   const dy=g.transition==="drag-up"?-p*h:g.transition==="drag-down"?p*h:0;
+   const nx=g.transition==="drag-left"?(1-p)*w:g.transition==="drag-right"?-(1-p)*w:0;
+   const ny=g.transition==="drag-up"?(1-p)*h:g.transition==="drag-down"?-(1-p)*h:0;
+   drawPhotoCell(current,x,y,w,h,fit,1,1,dx,dy);
+   drawPhotoCell(next,x,y,w,h,fit,1,1,nx,ny);
   }else if(g.transition==="zoom"){
    drawPhotoCell(current,x,y,w,h,fit,1,1+p*.16);drawPhotoCell(next,x,y,w,h,fit,p,.84+p*.16);
   }else if(g.transition==="kenburns"){
