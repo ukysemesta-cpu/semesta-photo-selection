@@ -11,6 +11,9 @@ const canvas=$("carouselCanvas"),ctx=canvas.getContext("2d");
 const settings=()=>({
  transition:$("carouselTransition").value,
  layout:$("carouselLayout").value,
+ storyType:$("storyType").value, storyLayout:$("storyLayout").value,
+ storyHeadline:$("storyHeadline").value.trim(), storySubheadline:$("storySubheadline").value.trim(),
+ storyCta:$("storyCta").value.trim(), storySlideCount:Number($("storySlideCount").value)||0,
  duration:Number($("carouselDuration").value),
  transitionDuration:Number($("carouselTransitionDuration").value),
  fit:$("carouselFit").value,background:$("carouselBackground").value,
@@ -56,7 +59,54 @@ function fitImage(img,x,y,w,h,fit,alpha=1,scale=1,offsetX=0,offsetY=0){
  ctx.save();ctx.globalAlpha=alpha;ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
  ctx.drawImage(img,x+(w-dw)/2+offsetX,y+(h-dh)/2+offsetY,dw,dh);ctx.restore();
 }
-function feedCount(s=settings()){return s.layout==="grid4"?Math.ceil(photos.length/4):photos.length;}
+function feedCount(s=settings()){
+ if(s.layout==="grid4")return Math.ceil(photos.length/4);
+ return s.storySlideCount?Math.min(7,s.storySlideCount):photos.length;
+}
+function photoForSlide(index){return photos.length?photos[index%photos.length]:null;}
+function storyCopy(index,total,s){
+ const n=index+1, type=s.storyType;
+ const defaults={
+  portfolio:["Sebuah cerita, satu kenangan","Detail yang membuat momen ini istimewa","Setiap momen layak dikenang"],
+  product:["Kenali lebih dekat","Detail dan keunggulan pilihanmu","Temukan pilihan yang tepat"],
+  promo:["Ada kabar spesial untukmu","Nikmati penawaran pilihan","Jangan lewatkan kesempatan ini"],
+  testimonial:["Cerita nyata dari pelanggan","Pengalaman yang mereka rasakan","Giliran ceritamu berikutnya"],
+  tips:["Tahukah kamu?","Hal penting yang perlu diperhatikan","Simpan tips ini untuk nanti"],
+  story:["Di balik sebuah momen","Proses, detail, dan cerita","Setiap proses punya cerita"],
+  news:["Informasi terbaru","Berikut detail yang perlu kamu tahu","Pantau informasi selanjutnya"]
+ };
+ const set=defaults[type]||defaults.portfolio;
+ if(n===1)return {title:s.storyHeadline||set[0],body:s.storySubheadline||set[1],tag:"SEMESTA · "+type.toUpperCase()};
+ if(n===total)return {title:s.storyCta||set[2],body:"Hubungi tim Semesta untuk informasi lebih lanjut.",tag:"LET'S CONNECT"};
+ return {title:set[1],body:s.storySubheadline||"Dirangkai dengan perhatian pada setiap detail.",tag:`${String(n).padStart(2,"0")} / ${String(total).padStart(2,"0")}`};
+}
+function drawStoryOverlay(index,total,s){
+ if(s.layout==="grid4")return;
+ const copy=storyCopy(index,total,s),w=canvas.width,h=canvas.height;
+ const dark=s.storyLayout!=="clean";
+ ctx.save();
+ const grad=ctx.createLinearGradient(0,h*.48,0,h);
+ grad.addColorStop(0,"rgba(0,0,0,0)");grad.addColorStop(1,dark?"rgba(0,0,0,.78)":"rgba(0,0,0,.58)");
+ ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
+ const pad=w*.075, bottom=h*.09;
+ const accent=s.storyLayout==="bold"?"#e8d98d":"#ffffff";
+ ctx.fillStyle=accent;ctx.font=`700 ${Math.round(w*.018)}px Arial`;ctx.letterSpacing="2px";
+ ctx.fillText(copy.tag.toUpperCase(),pad,h-bottom-h*.20);
+ ctx.fillStyle="#fff";ctx.font=`800 ${Math.round(w*(s.storyLayout==="bold"?.067:.057))}px Arial`;
+ const titleLines=wrapCanvasText(ctx,copy.title,w-pad*2);
+ let y=h-bottom-h*.14;
+ titleLines.slice(0,3).forEach(line=>{ctx.fillText(line,pad,y);y+=w*.069;});
+ ctx.font=`400 ${Math.round(w*.025)}px Arial`;ctx.fillStyle="rgba(255,255,255,.9)";
+ const bodyLines=wrapCanvasText(ctx,copy.body,w-pad*2);
+ y+=w*.012;bodyLines.slice(0,3).forEach(line=>{ctx.fillText(line,pad,y);y+=w*.035;});
+ if(s.storyLayout==="bold"){ctx.fillStyle="#e8d98d";ctx.fillRect(pad,h-bottom,w*.13,Math.max(5,w*.006));}
+ ctx.restore();
+}
+function wrapCanvasText(c,text,maxWidth){
+ const words=String(text||"").split(/\s+/),lines=[];let line="";
+ for(const word of words){const test=line?line+" "+word:word;if(c.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}
+ if(line)lines.push(line);return lines;
+}
 function drawPhotoCell(photo,x,y,w,h,fit,alpha=1,scale=1,offsetX=0,offsetY=0){
  if(!photo)return;
  fitImage(photo.img,x,y,w,h,fit,alpha,scale,offsetX,offsetY);
@@ -67,7 +117,8 @@ function drawFeed(index,animated=false,elapsed=0,s=settings()){
  if(!photos.length){$("carouselSlideLabel").textContent="Feed 0 / 0";return;}
  const count=feedCount(s);active=Math.max(0,Math.min(index,count-1));
  if(s.layout!=="grid4"){
-   drawPhotoCell(photos[active],0,0,w,h,s.fit);
+   drawPhotoCell(photoForSlide(active),0,0,w,h,s.fit);
+   drawStoryOverlay(active,count,s);
    $("carouselSlideLabel").textContent=`Slide ${active+1} / ${count}`;
  }else{
    const gap=Math.round(w*.012),pad=Math.round(w*.012),cw=(w-pad*2-gap)/2,ch=(h-pad*2-gap)/2;
@@ -123,7 +174,7 @@ function drawIndependentGridCell(list,grid,x,y,w,h,time,g,fit){
 }
 function drawSlide(index){drawFeed(index,false,0,settings());renderList();}
 function renderList(){
- $("carouselPhotoCount").textContent=`${photos.length} foto · ${feedCount()} feed`;
+ $("carouselPhotoCount").textContent=`${photos.length} foto · ${feedCount()} slide`;
  $("carouselPhotoList").innerHTML=photos.length?photos.map((p,i)=>`
  <div class="carousel-photo-row ${i===active?"active":""}" data-index="${i}">
   <img src="${p.url}" alt="">
@@ -182,6 +233,10 @@ syncGridSettingsVisibility();
  $(`g${n}Delay`).addEventListener("input",e=>$(`g${n}DelayValue`).textContent=`${Number(e.target.value).toFixed(2)} detik`);
  [`g${n}Transition`,`g${n}Duration`,`g${n}TransitionDuration`,`g${n}Delay`].forEach(id=>$(id).addEventListener("change",()=>{stopPreview();drawSlide(active);}));
 });
+["storyType","storySlideCount","storyLayout","storyHeadline","storySubheadline","storyCta"].forEach(id=>{
+ const el=$(id);el.addEventListener("input",()=>{stopPreview();drawSlide(Math.min(active,feedCount()-1));});
+ el.addEventListener("change",()=>{stopPreview();active=Math.min(active,feedCount()-1);drawSlide(active);});
+});
 $("carouselDuration").addEventListener("input",e=>$("carouselDurationValue").textContent=`${e.target.value} detik`);
 $("carouselTransitionDuration").addEventListener("input",e=>$("carouselTransitionValue").textContent=`${Number(e.target.value).toFixed(1)} detik`);
 function canvasBlob(c){return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Gagal membuat gambar.")),"image/jpeg",.94));}
@@ -222,6 +277,13 @@ function drawTransitionFrame(from,to,progress,elapsed,transition,s){
  }else if(transition==="zoom"){
   fitImage(from.img,0,0,w,h,s.fit,1,1+p*.18);
   fitImage(to.img,0,0,w,h,s.fit,p,.82+p*.18);
+ }else if(["drag-left","drag-right","drag-up","drag-down"].includes(transition)){
+  const dx=transition==="drag-left"?-p*w:transition==="drag-right"?p*w:0;
+  const dy=transition==="drag-up"?-p*h:transition==="drag-down"?p*h:0;
+  const nx=transition==="drag-left"?(1-p)*w:transition==="drag-right"?-(1-p)*w:0;
+  const ny=transition==="drag-up"?(1-p)*h:transition==="drag-down"?-(1-p)*h:0;
+  fitImage(from.img,dx,dy,w,h,s.fit,1);
+  fitImage(to.img,nx,ny,w,h,s.fit,1);
  }else{
   fitImage(to.img,0,0,w,h,s.fit,1,1+Math.sin(elapsed*.7)*.045,Math.sin(elapsed*.6)*w*.018);
  }
@@ -230,15 +292,16 @@ function drawVideoFrame(time,s){
  const count=feedCount(s),total=count*s.duration;
  if(s.layout==="grid4"){drawFeed(0,true,time,s);return gridAnimationTotal();}
  const index=Math.min(count-1,Math.floor(time/s.duration)),local=time-index*s.duration;
- const next=(index+1)%count;
+ const next=(index+1)%count,current=photoForSlide(index),nextPhoto=photoForSlide(next);
  if(local>s.duration-s.transitionDuration&&count>1){
-  drawTransitionFrame(photos[index],photos[next],(local-(s.duration-s.transitionDuration))/s.transitionDuration,local,s.transition,s);
+  drawTransitionFrame(current,nextPhoto,(local-(s.duration-s.transitionDuration))/s.transitionDuration,local,s.transition,s);
  }else{
   ctx.fillStyle=s.background;ctx.fillRect(0,0,canvas.width,canvas.height);
   const progress=local/s.duration;
-  if(s.transition==="kenburns")fitImage(photos[index].img,0,0,canvas.width,canvas.height,s.fit,1,1+progress*.08,Math.sin(progress*Math.PI)*canvas.width*.012);
-  else fitImage(photos[index].img,0,0,canvas.width,canvas.height,s.fit);
+  if(s.transition==="kenburns")fitImage(current.img,0,0,canvas.width,canvas.height,s.fit,1,1+progress*.08,Math.sin(progress*Math.PI)*canvas.width*.012);
+  else fitImage(current.img,0,0,canvas.width,canvas.height,s.fit);
  }
+ drawStoryOverlay(index,count,s);
  return total;
 }
 async function recordWebm(s){
