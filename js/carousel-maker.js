@@ -2,6 +2,7 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const modeCollage=$("showCollageMode"),modeCarousel=$("showCarouselMode");
+const panelModeCollage=$("collageModeButton"),panelModeCarousel=$("carouselModeButton");
 const collageMain=document.querySelector(".collage-app"),carouselRoot=$("carouselMaker");
 const collageActions=$("collageExportActions");
 if(!modeCollage||!modeCarousel||!carouselRoot)return;
@@ -19,11 +20,14 @@ function switchMode(mode){
  const carousel=mode==="carousel";
  collageMain.hidden=carousel;carouselRoot.hidden=!carousel;
  collageActions.hidden=carousel;
- modeCollage.classList.toggle("active",!carousel);modeCarousel.classList.toggle("active",carousel);
+ modeCollage?.classList.toggle("active",!carousel);modeCarousel?.classList.toggle("active",carousel);
+ panelModeCollage?.classList.toggle("active",!carousel);panelModeCarousel?.classList.toggle("active",carousel);
  if(carousel)drawSlide(active);
 }
-modeCollage.addEventListener("click",()=>switchMode("collage"));
-modeCarousel.addEventListener("click",()=>switchMode("carousel"));
+modeCollage?.addEventListener("click",()=>switchMode("collage"));
+modeCarousel?.addEventListener("click",()=>switchMode("carousel"));
+panelModeCollage?.addEventListener("click",()=>switchMode("collage"));
+panelModeCarousel?.addEventListener("click",()=>switchMode("carousel"));
 function loadImage(file){return new Promise((resolve,reject)=>{
  const url=URL.createObjectURL(file),img=new Image();
  img.onload=()=>resolve({name:file.name,url,img});
