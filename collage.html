@@ -87,6 +87,27 @@
       <div class="tool-help">Urutkan slide dengan tombol ↑ ↓. Setiap foto menjadi satu slide 4:5.</div>
       <div id="carouselPhotoList" class="carousel-photo-list"><div class="tool-empty">Tambahkan foto untuk mulai.</div></div>
     </section>
+    <section class="tool-section story-builder">
+      <div class="tool-section-head"><b>Story Carousel Builder</b><span class="muted">Alur konten</span></div>
+      <label class="tool-label" for="storyType">Jenis konten</label>
+      <select id="storyType">
+        <option value="portfolio">Portfolio / Wedding</option><option value="product">Product</option>
+        <option value="promo">Promo</option><option value="testimonial">Testimonial</option>
+        <option value="tips">Tips / Edukasi</option><option value="story">Story / Behind the Scenes</option>
+        <option value="news">News / Informasi</option>
+      </select>
+      <label class="tool-label" for="storySlideCount">Jumlah slide</label>
+      <select id="storySlideCount"><option value="0">Otomatis sesuai foto</option><option value="3">3 slide</option><option value="4">4 slide</option><option value="5">5 slide</option><option value="6">6 slide</option><option value="7">7 slide</option></select>
+      <label class="tool-label" for="storyLayout">Gaya desain</label>
+      <select id="storyLayout"><option value="editorial">Editorial minimalis</option><option value="bold">Bold / Modern</option><option value="clean">Clean / Minimal</option></select>
+      <label class="tool-label" for="storyHeadline">Judul / Hook</label>
+      <input id="storyHeadline" type="text" maxlength="70" value="Cerita di balik setiap momen" placeholder="Tulis judul pembuka">
+      <label class="tool-label" for="storySubheadline">Deskripsi singkat</label>
+      <textarea id="storySubheadline" rows="2" maxlength="140" placeholder="Tambahkan keterangan singkat">Momen istimewa yang dirangkai dengan cerita.</textarea>
+      <label class="tool-label" for="storyCta">Teks penutup / CTA</label>
+      <input id="storyCta" type="text" maxlength="70" value="Abadikan ceritamu bersama Semesta" placeholder="Contoh: Hubungi kami untuk booking">
+      <div class="tool-help">Sistem membagi alur menjadi Hook → Cerita / Detail → CTA. Teks dapat diubah dan akan diterapkan konsisten pada seluruh rangkaian.</div>
+    </section>
     <section class="tool-section">
       <label class="tool-label" for="carouselLayout">Layout feed</label>
       <select id="carouselLayout">
@@ -101,7 +122,9 @@
       <div class="grid-animation-card" data-grid="0">
         <b>GRID 1 · Kiri atas</b>
         <label class="tool-label" for="g1Transition">Jenis transisi</label>
-        <select id="g1Transition" class="grid-transition"><option value="fade">Fade / Dissolve</option><option value="slide">Slide</option><option value="zoom">Zoom</option><option value="kenburns">Ken Burns</option><option value="blur">Soft Blur</option><option value="drag-left">Drag Left</option><option value="drag-right">Drag Right</option><option value="drag-up">Drag Up (Vertikal)</option><option value="drag-down">Drag Down (Vertikal)</option></select>
+        <select id="g1Transition" class="grid-transition"><option value="fade">Fade / Dissolve</option><option value="slide">Slide</option><option value="zoom">Zoom</option><option value="kenburns">Ken Burns</option><option value="blur">Soft Blur</option>
+        <option value="drag-left">Drag Left</option><option value="drag-right">Drag Right</option>
+        <option value="drag-up">Drag Up</option><option value="drag-down">Drag Down</option><option value="drag-left">Drag Left</option><option value="drag-right">Drag Right</option><option value="drag-up">Drag Up (Vertikal)</option><option value="drag-down">Drag Down (Vertikal)</option></select>
         <label class="tool-label" for="g1Duration">Durasi foto <span id="g1DurationValue">2.5 detik</span></label>
         <input id="g1Duration" class="grid-duration" type="range" min="1" max="6" step=".5" value="2.5">
         <label class="tool-label" for="g1TransitionDuration">Durasi transisi <span id="g1TransitionDurationValue">0.7 detik</span></label>
@@ -179,6 +202,6 @@
     <div class="workspace-footer"><span>Instagram Feed · Portrait 4:5</span><span>JPG per slide · Video MP4 transisi</span></div>
   </section>
 </section>
-<script src="js/collage.js?v=20261113-carousel-maker-v16"></script>
-<script src="js/carousel-maker.js?v=20261113-carousel-maker-v16"></script>
+<script src="js/collage.js?v=20261113-story-carousel-v2"></script>
+<script src="js/carousel-maker.js?v=20261113-story-carousel-v2"></script>
 </body></html>
