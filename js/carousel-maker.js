@@ -226,6 +226,7 @@ $("carouselPlayPreview").addEventListener("click",()=>{
 });
 function syncGridSettingsVisibility(){$("gridAnimationSettings").hidden=$("carouselLayout").value!=="grid4";}
 syncGridSettingsVisibility();
+$("carouselTransition").addEventListener("change",()=>{stopPreview();drawSlide(active);});
 ["carouselFit","carouselBackground","carouselQuality","carouselLayout"].forEach(id=>$(id).addEventListener("change",()=>{stopPreview();syncGridSettingsVisibility();drawSlide(Math.min(active,feedCount()-1));}));
 [0,1,2,3].forEach(i=>{const n=i+1;
  $(`g${n}Duration`).addEventListener("input",e=>$(`g${n}DurationValue`).textContent=`${Number(e.target.value).toFixed(1)} detik`);
