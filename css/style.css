@@ -426,3 +426,8 @@ body{background:#174b35;color:var(--ink)}
  .carousel-workspace .history-actions .btn{min-height:38px;padding:8px 10px;font-size:11px}
  #carouselPlayPreview{flex:1 1 100%}
 }
+
+/* V1.4 — carousel 4-up feed controls */
+#carouselLayout{border-color:#cbded2}
+#carouselPlayPreview[aria-pressed="true"]{background:#9f3f3f!important;color:#fff!important}
+.carousel-preview-stage canvas{max-width:100%;height:auto;max-height:calc(100vh - 180px);object-fit:contain}
