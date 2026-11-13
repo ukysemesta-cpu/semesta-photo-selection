@@ -411,3 +411,18 @@ body{background:#174b35;color:var(--ink)}
  .collage-mode-panel{margin-bottom:14px!important}
  .collage-mode-tab{min-height:44px!important;font-size:12px!important;padding:11px 8px!important}
 }
+
+/* V1.3 — fix hidden mode switching; CSS grid/flex must not override hidden */
+.collage-app[hidden]{display:none!important}
+.carousel-maker[hidden],#collageExportActions[hidden]{display:none!important}
+.carousel-maker:not([hidden]){display:grid}
+.carousel-controls{min-width:0}
+.carousel-workspace{min-width:0}
+#carouselPlayPreview{min-width:132px}
+@media(max-width:650px){
+ .carousel-maker:not([hidden]){display:flex!important}
+ .carousel-workspace .workspace-head{align-items:flex-start;gap:10px}
+ .carousel-workspace .history-actions{display:flex;flex-wrap:wrap;gap:6px}
+ .carousel-workspace .history-actions .btn{min-height:38px;padding:8px 10px;font-size:11px}
+ #carouselPlayPreview{flex:1 1 100%}
+}
