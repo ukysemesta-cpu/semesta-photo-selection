@@ -10,6 +10,7 @@ let photos=[],active=0,previewTimer=null,exporting=false,previewRaf=0;
 const canvas=$("carouselCanvas"),ctx=canvas.getContext("2d");
 const settings=()=>({
  transition:$("carouselTransition").value,
+ layout:$("carouselLayout").value,
  duration:Number($("carouselDuration").value),
  transitionDuration:Number($("carouselTransitionDuration").value),
  fit:$("carouselFit").value,background:$("carouselBackground").value,
@@ -51,17 +52,54 @@ function fitImage(img,x,y,w,h,fit,alpha=1,scale=1,offsetX=0){
  ctx.save();ctx.globalAlpha=alpha;ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
  ctx.drawImage(img,x+(w-dw)/2+offsetX,y+(h-dh)/2,dw,dh);ctx.restore();
 }
-function drawSlide(index){
- const s=settings(),w=canvas.width=s.width,h=canvas.height=s.height;
- ctx.fillStyle=s.background;ctx.fillRect(0,0,w,h);
- if(!photos.length){$("carouselSlideLabel").textContent="Slide 0 / 0";return;}
- active=Math.max(0,Math.min(index,photos.length-1));
- fitImage(photos[active].img,0,0,w,h,s.fit);
- $("carouselSlideLabel").textContent=`Slide ${active+1} / ${photos.length}`;
- renderList();
+function feedCount(s=settings()){return s.layout==="grid4"?Math.ceil(photos.length/4):photos.length;}
+function drawPhotoCell(photo,x,y,w,h,fit,alpha=1,scale=1,offsetX=0){
+ if(!photo)return;
+ fitImage(photo.img,x,y,w,h,fit,alpha,scale,offsetX);
 }
+function drawFeed(index,animated=false,elapsed=0,s=settings()){
+ const w=canvas.width=s.width,h=canvas.height=s.height;
+ ctx.fillStyle=s.background;ctx.fillRect(0,0,w,h);
+ if(!photos.length){$("carouselSlideLabel").textContent="Feed 0 / 0";return;}
+ const count=feedCount(s);active=Math.max(0,Math.min(index,count-1));
+ if(s.layout!=="grid4"){
+   drawPhotoCell(photos[active],0,0,w,h,s.fit);
+   $("carouselSlideLabel").textContent=`Slide ${active+1} / ${count}`;
+ }else{
+   const gap=Math.round(w*.012),pad=Math.round(w*.012),cw=(w-pad*2-gap)/2,ch=(h-pad*2-gap)/2;
+   const positions=[[pad,pad],[pad+cw+gap,pad],[pad,pad+ch+gap],[pad+cw+gap,pad+ch+gap]];
+   const start=active*4;
+   for(let k=0;k<4;k++){
+     const photo=photos[start+k];if(!photo)continue;
+     const [x,y]=positions[k];
+     let reveal=1;
+     if(animated){
+       const per=Math.max(.35,s.duration/4);
+       reveal=Math.max(0,Math.min(1,(elapsed-k*per)/Math.min(s.transitionDuration,per)));
+     }
+     if(reveal>0){
+       ctx.save();
+       if(s.transition==="fade"||s.transition==="blur") {
+         if(s.transition==="blur")ctx.filter=`blur(${Math.round(10*(1-reveal))}px)`;
+         drawPhotoCell(photo,x,y,cw,ch,s.fit,reveal);
+       } else if(s.transition==="slide"){
+         ctx.beginPath();ctx.rect(x,y,cw*reveal,ch);ctx.clip();
+         drawPhotoCell(photo,x,y,cw,ch,s.fit,1);
+       } else if(s.transition==="zoom"){
+         drawPhotoCell(photo,x,y,cw,ch,s.fit,reveal,.82+.18*reveal);
+       } else {
+         drawPhotoCell(photo,x,y,cw,ch,s.fit,1,1+reveal*.07,Math.sin(reveal*Math.PI)*cw*.015);
+       }
+       ctx.restore();
+     }
+     ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=Math.max(2,w*.002);ctx.strokeRect(x,y,cw,ch);
+   }
+   $("carouselSlideLabel").textContent=`Feed ${active+1} / ${count} · Foto ${Math.min(4,photos.length-start)} dari 4`;
+ }
+}
+function drawSlide(index){drawFeed(index,false,0,settings());renderList();}
 function renderList(){
- $("carouselPhotoCount").textContent=`${photos.length} foto`;
+ $("carouselPhotoCount").textContent=`${photos.length} foto · ${feedCount()} feed`;
  $("carouselPhotoList").innerHTML=photos.length?photos.map((p,i)=>`
  <div class="carousel-photo-row ${i===active?"active":""}" data-index="${i}">
   <img src="${p.url}" alt="">
@@ -91,24 +129,28 @@ $("carouselPhotoList").addEventListener("click",e=>{
  else active=i;
  active=Math.min(active,Math.max(0,photos.length-1));drawSlide(active);
 });
-$("carouselPrev").addEventListener("click",()=>drawSlide((active-1+photos.length)%Math.max(photos.length,1)));
-$("carouselNext").addEventListener("click",()=>drawSlide((active+1)%Math.max(photos.length,1)));
+$("carouselPrev").addEventListener("click",()=>drawSlide((active-1+feedCount()+feedCount())%Math.max(feedCount(),1)));
+$("carouselNext").addEventListener("click",()=>drawSlide((active+1)%Math.max(feedCount(),1)));
 $("carouselPlayPreview").addEventListener("click",()=>{
- if(!photos.length||exporting)return;
+ if(!photos.length||exporting){setStatus("Tambahkan foto terlebih dahulu untuk menjalankan preview.");return;}
  if(previewRaf){stopPreview();drawSlide(active);return;}
- const s=settings(),total=photos.length*s.duration,started=performance.now();
- $("carouselPlayPreview").textContent="■ Hentikan Preview";
+ const s=settings(),total=feedCount(s)*s.duration,started=performance.now();
+ const button=$("carouselPlayPreview");button.textContent="■ Hentikan Preview";
+ button.setAttribute("aria-pressed","true");
  function tick(now){
+   if(!previewRaf)return;
    const elapsed=(now-started)/1000;
-   if(elapsed>=total){stopPreview();drawSlide(0);return;}
-   drawVideoFrame(elapsed,s);
-   const slide=Math.min(photos.length,Math.floor(elapsed/s.duration)+1);
-   $("carouselSlideLabel").textContent=`Preview · Slide ${slide}/${photos.length}`;
+   if(elapsed>=total){stopPreview();button.setAttribute("aria-pressed","false");drawSlide(0);return;}
+   const feedIndex=Math.min(feedCount(s)-1,Math.floor(elapsed/s.duration));
+   const local=elapsed-feedIndex*s.duration;
+   if(s.layout==="grid4")drawFeed(feedIndex,true,local,s);
+   else drawVideoFrame(elapsed,s);
+   $("carouselSlideLabel").textContent=`Preview · ${s.layout==="grid4"?"Feed":"Slide"} ${feedIndex+1}/${feedCount(s)}`;
    previewRaf=requestAnimationFrame(tick);
  }
  previewRaf=requestAnimationFrame(tick);
 });
-["carouselFit","carouselBackground","carouselQuality"].forEach(id=>$(id).addEventListener("change",()=>drawSlide(active)));
+["carouselFit","carouselBackground","carouselQuality","carouselLayout"].forEach(id=>$(id).addEventListener("change",()=>{stopPreview();drawSlide(Math.min(active,feedCount()-1));}));
 $("carouselDuration").addEventListener("input",e=>$("carouselDurationValue").textContent=`${e.target.value} detik`);
 $("carouselTransitionDuration").addEventListener("input",e=>$("carouselTransitionValue").textContent=`${Number(e.target.value).toFixed(1)} detik`);
 function canvasBlob(c){return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Gagal membuat gambar.")),"image/jpeg",.94));}
@@ -122,16 +164,16 @@ $("exportCarouselJpg").addEventListener("click",async()=>{
   if(!window.JSZip)await loadScript("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js");
   const zip=new JSZip(),s=settings(),temp=document.createElement("canvas");temp.width=s.width;temp.height=s.height;
   const tctx=temp.getContext("2d");
-  for(let i=0;i<photos.length;i++){
-   tctx.fillStyle=s.background;tctx.fillRect(0,0,temp.width,temp.height);
-   const img=photos[i].img,ratio=s.fit==="contain"?Math.min(temp.width/img.width,temp.height/img.height):Math.max(temp.width/img.width,temp.height/img.height);
-   const dw=img.width*ratio,dh=img.height*ratio;
-   tctx.drawImage(img,(temp.width-dw)/2,(temp.height-dh)/2,dw,dh);
+  const originalCanvas=canvas,originalWidth=canvas.width,originalHeight=canvas.height;
+  for(let i=0;i<feedCount(s);i++){
+   drawFeed(i,false,0,s);
+   tctx.clearRect(0,0,temp.width,temp.height);tctx.drawImage(originalCanvas,0,0,temp.width,temp.height);
    const blob=await canvasBlob(temp);
-   zip.file(`slide-${String(i+1).padStart(2,"0")}.jpg`,blob);
-   $("carouselProgress").hidden=false;$("carouselProgress").value=Math.round((i+1)/photos.length*70);
-   setStatus(`Membuat slide JPG ${i+1}/${photos.length}...`);
+   zip.file(`feed-${String(i+1).padStart(2,"0")}.jpg`,blob);
+   $("carouselProgress").hidden=false;$("carouselProgress").value=Math.round((i+1)/feedCount(s)*70);
+   setStatus(`Membuat JPG feed ${i+1}/${feedCount(s)}...`);
   }
+  canvas.width=originalWidth;canvas.height=originalHeight;
   const blob=await zip.generateAsync({type:"blob",compression:"DEFLATE"},m=>{$("carouselProgress").value=70+Math.round(m.percent*.3);});
   downloadBlob(blob,"semesta-carousel-jpg.zip");setStatus(`${photos.length} slide JPG berhasil dibuat dalam ZIP.`);
  }catch(err){setStatus("Ekspor JPG gagal: "+err.message);}
@@ -154,14 +196,15 @@ function drawTransitionFrame(from,to,progress,elapsed,transition,s){
  }
 }
 function drawVideoFrame(time,s){
- const duration=s.duration,trans=s.transitionDuration,total=photos.length*duration;
- const index=Math.min(photos.length-1,Math.floor(time/duration)),local=time-index*duration;
- const next=(index+1)%photos.length;
- if(local>duration-trans&&photos.length>1){
-  drawTransitionFrame(photos[index],photos[next],(local-(duration-trans))/trans,local,s.transition,s);
+ const count=feedCount(s),total=count*s.duration;
+ const index=Math.min(count-1,Math.floor(time/s.duration)),local=time-index*s.duration;
+ if(s.layout==="grid4"){drawFeed(index,true,local,s);return total;}
+ const next=(index+1)%count;
+ if(local>s.duration-s.transitionDuration&&count>1){
+  drawTransitionFrame(photos[index],photos[next],(local-(s.duration-s.transitionDuration))/s.transitionDuration,local,s.transition,s);
  }else{
   ctx.fillStyle=s.background;ctx.fillRect(0,0,canvas.width,canvas.height);
-  const progress=local/duration;
+  const progress=local/s.duration;
   if(s.transition==="kenburns")fitImage(photos[index].img,0,0,canvas.width,canvas.height,s.fit,1,1+progress*.08,Math.sin(progress*Math.PI)*canvas.width*.012);
   else fitImage(photos[index].img,0,0,canvas.width,canvas.height,s.fit);
  }
@@ -170,12 +213,13 @@ function drawVideoFrame(time,s){
 async function recordWebm(s){
  const fps=24,stream=canvas.captureStream(fps);
  const mime=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"].find(t=>MediaRecorder.isTypeSupported(t));
+ if(!window.MediaRecorder||!canvas.captureStream)throw new Error("Browser tidak mendukung perekaman canvas. Gunakan Chrome atau Edge desktop terbaru.");
  if(!mime)throw new Error("Browser ini tidak mendukung perekaman video. Gunakan Chrome atau Edge terbaru.");
  const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:s.width>=1080?8000000:4500000});
  const chunks=[];recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
  const stopped=new Promise((resolve,reject)=>{recorder.onstop=()=>resolve(new Blob(chunks,{type:mime}));recorder.onerror=()=>reject(new Error("Perekaman video gagal."));});
  recorder.start(250);
- const total=photos.length*s.duration,started=performance.now();
+ const total=feedCount(s)*s.duration,started=performance.now();
  await new Promise(resolve=>{
   function frame(now){
    const t=Math.min(total,(now-started)/1000);drawVideoFrame(t,s);
@@ -191,7 +235,7 @@ async function recordWebm(s){
 $("exportCarouselMp4").addEventListener("click",async()=>{
  if(!photos.length||exporting)return;
  stopPreview();
- const s=settings(),duration=photos.length*s.duration;
+ const s=settings(),duration=feedCount(s)*s.duration;
  if(duration>20){setStatus(`Durasi total ${duration.toFixed(1)} detik. Maksimal 20 detik; kurangi durasi foto atau jumlah slide.`);return;}
  exporting=true;renderList();$("carouselProgress").hidden=false;$("carouselProgress").value=0;
  try{
