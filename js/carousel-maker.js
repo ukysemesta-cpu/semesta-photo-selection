@@ -6,7 +6,7 @@ const panelModeCollage=$("collageModeButton"),panelModeCarousel=$("carouselModeB
 const collageMain=document.querySelector(".collage-app"),carouselRoot=$("carouselMaker");
 const collageActions=$("collageExportActions");
 if(!modeCollage||!modeCarousel||!carouselRoot)return;
-let photos=[],active=0,previewTimer=null,exporting=false;
+let photos=[],active=0,previewTimer=null,exporting=false,previewRaf=0;
 const canvas=$("carouselCanvas"),ctx=canvas.getContext("2d");
 const settings=()=>({
  transition:$("carouselTransition").value,
@@ -16,13 +16,24 @@ const settings=()=>({
  width:Number($("carouselQuality").value),height:Number($("carouselQuality").value)*1.25
 });
 function setStatus(msg){$("carouselExportStatus").textContent=msg;}
+function stopPreview(){
+ if(previewRaf)cancelAnimationFrame(previewRaf);
+ previewRaf=0;
+ const play=$("carouselPlayPreview");
+ if(play)play.textContent="▶ Putar Animasi";
+}
 function switchMode(mode){
  const carousel=mode==="carousel";
- collageMain.hidden=carousel;carouselRoot.hidden=!carousel;
+ if(!carousel)stopPreview();
+ collageMain.hidden=carousel;
+ carouselRoot.hidden=!carousel;
  collageActions.hidden=carousel;
  modeCollage?.classList.toggle("active",!carousel);modeCarousel?.classList.toggle("active",carousel);
  panelModeCollage?.classList.toggle("active",!carousel);panelModeCarousel?.classList.toggle("active",carousel);
- if(carousel)drawSlide(active);
+ if(carousel){
+   drawSlide(active);
+   window.scrollTo({top:0,behavior:"smooth"});
+ }
 }
 modeCollage?.addEventListener("click",()=>switchMode("collage"));
 modeCarousel?.addEventListener("click",()=>switchMode("carousel"));
@@ -64,12 +75,14 @@ function renderList(){
 }
 function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 $("carouselPhotoInput").addEventListener("change",async e=>{
+ stopPreview();
  const files=[...e.target.files].filter(f=>f.type.startsWith("image/"));
  try{for(const f of files)photos.push(await loadImage(f));active=0;drawSlide(active);setStatus(`${photos.length} foto siap. Atur urutan slide lalu ekspor.`);}
  catch(err){setStatus(err.message);}
  e.target.value="";
 });
 $("carouselPhotoList").addEventListener("click",e=>{
+ stopPreview();
  const row=e.target.closest("[data-index]");if(!row)return;
  const i=Number(row.dataset.index),action=e.target.dataset.action;
  if(action==="up"&&i>0)[photos[i-1],photos[i]]=[photos[i],photos[i-1]];
@@ -80,6 +93,21 @@ $("carouselPhotoList").addEventListener("click",e=>{
 });
 $("carouselPrev").addEventListener("click",()=>drawSlide((active-1+photos.length)%Math.max(photos.length,1)));
 $("carouselNext").addEventListener("click",()=>drawSlide((active+1)%Math.max(photos.length,1)));
+$("carouselPlayPreview").addEventListener("click",()=>{
+ if(!photos.length||exporting)return;
+ if(previewRaf){stopPreview();drawSlide(active);return;}
+ const s=settings(),total=photos.length*s.duration,started=performance.now();
+ $("carouselPlayPreview").textContent="■ Hentikan Preview";
+ function tick(now){
+   const elapsed=(now-started)/1000;
+   if(elapsed>=total){stopPreview();drawSlide(0);return;}
+   drawVideoFrame(elapsed,s);
+   const slide=Math.min(photos.length,Math.floor(elapsed/s.duration)+1);
+   $("carouselSlideLabel").textContent=`Preview · Slide ${slide}/${photos.length}`;
+   previewRaf=requestAnimationFrame(tick);
+ }
+ previewRaf=requestAnimationFrame(tick);
+});
 ["carouselFit","carouselBackground","carouselQuality"].forEach(id=>$(id).addEventListener("change",()=>drawSlide(active)));
 $("carouselDuration").addEventListener("input",e=>$("carouselDurationValue").textContent=`${e.target.value} detik`);
 $("carouselTransitionDuration").addEventListener("input",e=>$("carouselTransitionValue").textContent=`${Number(e.target.value).toFixed(1)} detik`);
@@ -88,7 +116,7 @@ async function loadScript(url){return new Promise((resolve,reject)=>{
  const s=document.createElement("script");s.src=url;s.onload=resolve;s.onerror=()=>reject(new Error("Tidak dapat memuat library ekspor. Periksa koneksi internet."));document.head.appendChild(s);
 });}
 $("exportCarouselJpg").addEventListener("click",async()=>{
- if(!photos.length||exporting)return;exporting=true;renderList();
+ if(!photos.length||exporting)return;stopPreview();exporting=true;renderList();
  try{
   setStatus("Menyiapkan file JPG...");
   if(!window.JSZip)await loadScript("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js");
@@ -162,6 +190,7 @@ async function recordWebm(s){
 }
 $("exportCarouselMp4").addEventListener("click",async()=>{
  if(!photos.length||exporting)return;
+ stopPreview();
  const s=settings(),duration=photos.length*s.duration;
  if(duration>20){setStatus(`Durasi total ${duration.toFixed(1)} detik. Maksimal 20 detik; kurangi durasi foto atau jumlah slide.`);return;}
  exporting=true;renderList();$("carouselProgress").hidden=false;$("carouselProgress").value=0;
