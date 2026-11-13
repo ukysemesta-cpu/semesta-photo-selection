@@ -384,3 +384,30 @@ body{background:#174b35;color:var(--ink)}
 .collage-mode-tab{min-height:42px;padding:9px 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:#315744;font:700 12px "DM Sans",sans-serif;cursor:pointer}
 .collage-mode-tab.active{background:#174b38;color:#fff;box-shadow:0 2px 8px #174b3826}
 .collage-mode-tab:focus-visible{outline:3px solid #d8c96c;outline-offset:2px}
+
+/* V1.2 — Semesta branded segmented mode selector */
+.collage-mode-panel{
+  display:flex!important;align-items:center;gap:4px!important;
+  width:100%;box-sizing:border-box;padding:5px!important;margin:0 0 16px!important;
+  border:1px solid #d9e6dd!important;border-radius:12px!important;
+  background:#f2f6f3!important;box-shadow:inset 0 1px 2px rgba(20,55,39,.04)
+}
+.collage-mode-tab{
+  appearance:none!important;-webkit-appearance:none!important;
+  flex:1 1 0;min-width:0;min-height:42px!important;
+  padding:10px 12px!important;border:1px solid transparent!important;
+  border-radius:8px!important;background:transparent!important;
+  color:#315744!important;font-family:inherit!important;font-size:12px!important;
+  font-weight:600!important;line-height:1.2!important;letter-spacing:.01em!important;
+  box-shadow:none!important;cursor:pointer;transition:background .18s ease,color .18s ease,border-color .18s ease
+}
+.collage-mode-tab.active{
+  background:#174b38!important;color:#fff!important;
+  border-color:#174b38!important;box-shadow:0 2px 6px rgba(23,75,56,.18)!important
+}
+.collage-mode-tab:not(.active):hover{background:#e5eee8!important;color:#174b38!important}
+.collage-mode-tab:focus-visible{outline:2px solid #c8b85b!important;outline-offset:2px!important}
+@media(max-width:480px){
+ .collage-mode-panel{margin-bottom:14px!important}
+ .collage-mode-tab{min-height:44px!important;font-size:12px!important;padding:11px 8px!important}
+}
