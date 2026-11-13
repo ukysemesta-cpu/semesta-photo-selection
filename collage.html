@@ -94,6 +94,55 @@
         <option value="grid4">4 foto dalam 1 feed (2 × 2)</option>
       </select>
       <div class="tool-help">Mode 4 grid menggabungkan maksimal 4 foto per feed. Setiap kotak muncul bergantian mengikuti animasi yang dipilih.</div>
+
+    <section class="tool-section" id="gridAnimationSettings">
+      <div class="tool-section-head"><b>Pengaturan animasi tiap grid</b><span class="muted">Independen</span></div>
+      <div class="tool-help">Setiap grid memiliki jenis transisi, durasi foto, durasi transisi, dan waktu mulai sendiri. Default dibuat bergantian agar tidak bergerak bersamaan.</div>
+      <div class="grid-animation-card" data-grid="0">
+        <b>GRID 1 · Kiri atas</b>
+        <label class="tool-label" for="g1Transition">Jenis transisi</label>
+        <select id="g1Transition" class="grid-transition"><option value="fade">Fade / Dissolve</option><option value="slide">Slide</option><option value="zoom">Zoom</option><option value="kenburns">Ken Burns</option><option value="blur">Soft Blur</option></select>
+        <label class="tool-label" for="g1Duration">Durasi foto <span id="g1DurationValue">2.5 detik</span></label>
+        <input id="g1Duration" class="grid-duration" type="range" min="1" max="6" step=".5" value="2.5">
+        <label class="tool-label" for="g1TransitionDuration">Durasi transisi <span id="g1TransitionDurationValue">0.7 detik</span></label>
+        <input id="g1TransitionDuration" class="grid-transition-duration" type="range" min=".2" max="1.5" step=".1" value=".7">
+        <label class="tool-label" for="g1Delay">Jeda mulai <span id="g1DelayValue">0.0 detik</span></label>
+        <input id="g1Delay" class="grid-delay" type="range" min="0" max="3" step=".25" value="0">
+      </div>
+      <div class="grid-animation-card" data-grid="1">
+        <b>GRID 2 · Kanan atas</b>
+        <label class="tool-label" for="g2Transition">Jenis transisi</label>
+        <select id="g2Transition" class="grid-transition"><option value="fade">Fade / Dissolve</option><option value="slide" selected>Slide</option><option value="zoom">Zoom</option><option value="kenburns">Ken Burns</option><option value="blur">Soft Blur</option></select>
+        <label class="tool-label" for="g2Duration">Durasi foto <span id="g2DurationValue">2.5 detik</span></label>
+        <input id="g2Duration" class="grid-duration" type="range" min="1" max="6" step=".5" value="2.5">
+        <label class="tool-label" for="g2TransitionDuration">Durasi transisi <span id="g2TransitionDurationValue">0.7 detik</span></label>
+        <input id="g2TransitionDuration" class="grid-transition-duration" type="range" min=".2" max="1.5" step=".1" value=".7">
+        <label class="tool-label" for="g2Delay">Jeda mulai <span id="g2DelayValue">0.5 detik</span></label>
+        <input id="g2Delay" class="grid-delay" type="range" min="0" max="3" step=".25" value=".5">
+      </div>
+      <div class="grid-animation-card" data-grid="2">
+        <b>GRID 3 · Kiri bawah</b>
+        <label class="tool-label" for="g3Transition">Jenis transisi</label>
+        <select id="g3Transition" class="grid-transition"><option value="fade">Fade / Dissolve</option><option value="slide">Slide</option><option value="zoom" selected>Zoom</option><option value="kenburns">Ken Burns</option><option value="blur">Soft Blur</option></select>
+        <label class="tool-label" for="g3Duration">Durasi foto <span id="g3DurationValue">2.5 detik</span></label>
+        <input id="g3Duration" class="grid-duration" type="range" min="1" max="6" step=".5" value="2.5">
+        <label class="tool-label" for="g3TransitionDuration">Durasi transisi <span id="g3TransitionDurationValue">0.7 detik</span></label>
+        <input id="g3TransitionDuration" class="grid-transition-duration" type="range" min=".2" max="1.5" step=".1" value=".7">
+        <label class="tool-label" for="g3Delay">Jeda mulai <span id="g3DelayValue">1.0 detik</span></label>
+        <input id="g3Delay" class="grid-delay" type="range" min="0" max="3" step=".25" value="1">
+      </div>
+      <div class="grid-animation-card" data-grid="3">
+        <b>GRID 4 · Kanan bawah</b>
+        <label class="tool-label" for="g4Transition">Jenis transisi</label>
+        <select id="g4Transition" class="grid-transition"><option value="fade">Fade / Dissolve</option><option value="slide">Slide</option><option value="zoom">Zoom</option><option value="kenburns" selected>Ken Burns</option><option value="blur">Soft Blur</option></select>
+        <label class="tool-label" for="g4Duration">Durasi foto <span id="g4DurationValue">2.5 detik</span></label>
+        <input id="g4Duration" class="grid-duration" type="range" min="1" max="6" step=".5" value="2.5">
+        <label class="tool-label" for="g4TransitionDuration">Durasi transisi <span id="g4TransitionDurationValue">0.7 detik</span></label>
+        <input id="g4TransitionDuration" class="grid-transition-duration" type="range" min=".2" max="1.5" step=".1" value=".7">
+        <label class="tool-label" for="g4Delay">Jeda mulai <span id="g4DelayValue">1.5 detik</span></label>
+        <input id="g4Delay" class="grid-delay" type="range" min="0" max="3" step=".25" value="1.5">
+      </div>
+    </section>
       <label class="tool-label" for="carouselTransition">Animasi transisi</label>
       <select id="carouselTransition">
         <option value="fade">Fade / Dissolve</option>
@@ -130,6 +179,6 @@
     <div class="workspace-footer"><span>Instagram Feed · Portrait 4:5</span><span>JPG per slide · Video MP4 transisi</span></div>
   </section>
 </section>
-<script src="js/collage.js?v=20261113-carousel-maker-v14"></script>
-<script src="js/carousel-maker.js?v=20261113-carousel-maker-v14"></script>
+<script src="js/collage.js?v=20261113-carousel-maker-v15"></script>
+<script src="js/carousel-maker.js?v=20261113-carousel-maker-v15"></script>
 </body></html>
