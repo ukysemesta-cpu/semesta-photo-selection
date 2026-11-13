@@ -10,10 +10,14 @@
 <body class="collage-body">
 <header class="collage-topbar">
   <a class="brand" href="index.html"><span class="brand-wordmark">SEMESTA</span><span class="brand-subtitle">COLLAGE STUDIO</span></a>
-  <div class="collage-top-actions"><a class="quick-link" href="index.html">← Dashboard</a><button class="btn btn-primary" id="downloadJpg">Download JPG</button><button class="btn btn-ghost" id="downloadPng">Download PNG</button></div>
+  <div class="collage-top-actions"><a class="quick-link" href="index.html">← Dashboard</a><button class="btn btn-ghost mode-switch active" id="showCollageMode" type="button">Kolase</button><button class="btn btn-ghost mode-switch" id="showCarouselMode" type="button">Carousel Maker</button><span id="collageExportActions"><button class="btn btn-primary" id="downloadJpg">Download JPG</button><button class="btn btn-ghost" id="downloadPng">Download PNG</button></span></div>
 </header>
 <main class="collage-app">
   <aside class="collage-controls">
+    <div class="collage-mode-panel" aria-label="Pilih mode editor">
+      <button class="collage-mode-tab active" id="collageModeButton" type="button">Kolase</button>
+      <button class="collage-mode-tab" id="carouselModeButton" type="button">Carousel Maker</button>
+    </div>
     <div class="collage-heading"><span class="eyebrow">PHOTO LAYOUT EDITOR</span><h1>Collage Studio</h1><p class="muted">Susun foto klien untuk Instagram Feed dan Story.</p></div>
     <section class="tool-section">
       <label class="tool-label" for="formatSelect">Format kanvas</label>
@@ -73,5 +77,53 @@
     <div class="workspace-footer"><span id="canvasStatus">Tambahkan foto untuk mulai membuat kolase.</span><span>Export resolusi penuh · 300 DPI-ready pixel dimensions</span></div>
   </section>
 </main>
-<script src="js/collage.js?v=20261104-collage-stay-frame-v6"></script>
+<section id="carouselMaker" class="carousel-maker" hidden>
+  <aside class="carousel-controls">
+    <div class="collage-heading"><span class="eyebrow">INSTAGRAM STORYTELLING</span><h1>Carousel Maker</h1><p class="muted">Rangkai foto menjadi carousel Instagram atau video dengan transisi.</p></div>
+    <section class="tool-section">
+      <div class="tool-section-head"><b>Foto carousel</b><span id="carouselPhotoCount">0 foto</span></div>
+      <label class="upload-button" for="carouselPhotoInput">＋ Tambahkan Foto</label>
+      <input id="carouselPhotoInput" type="file" accept="image/*" multiple hidden>
+      <div class="tool-help">Urutkan slide dengan tombol ↑ ↓. Setiap foto menjadi satu slide 4:5.</div>
+      <div id="carouselPhotoList" class="carousel-photo-list"><div class="tool-empty">Tambahkan foto untuk mulai.</div></div>
+    </section>
+    <section class="tool-section">
+      <label class="tool-label" for="carouselTransition">Animasi transisi</label>
+      <select id="carouselTransition">
+        <option value="fade">Fade / Dissolve</option>
+        <option value="slide">Slide Horizontal</option>
+        <option value="zoom">Zoom In</option>
+        <option value="kenburns">Ken Burns (Pan &amp; Zoom)</option>
+        <option value="blur">Soft Blur</option>
+      </select>
+      <label class="tool-label" for="carouselDuration">Durasi setiap foto <span id="carouselDurationValue">2.5 detik</span></label>
+      <input type="range" id="carouselDuration" min="1" max="6" step=".5" value="2.5">
+      <label class="tool-label" for="carouselTransitionDuration">Durasi transisi <span id="carouselTransitionValue">0.7 detik</span></label>
+      <input type="range" id="carouselTransitionDuration" min=".2" max="1.5" step=".1" value=".7">
+      <label class="tool-label" for="carouselFit">Tampilan foto</label>
+      <select id="carouselFit"><option value="cover">Penuhi frame (cover)</option><option value="contain">Tampilkan seluruh foto (contain)</option></select>
+      <div class="tool-help">Video dibatasi maksimal 20 detik agar proses ekspor tetap ringan di browser.</div>
+    </section>
+    <section class="tool-section">
+      <label class="tool-label" for="carouselBackground">Warna latar</label>
+      <input type="color" id="carouselBackground" value="#101810">
+      <label class="tool-label" for="carouselQuality">Resolusi video</label>
+      <select id="carouselQuality"><option value="720">720 × 900 (lebih ringan)</option><option value="1080">1080 × 1350 (Full HD)</option></select>
+    </section>
+    <section class="tool-section">
+      <div class="tool-section-head"><b>Ekspor</b><span class="muted">JPG + MP4</span></div>
+      <button class="btn btn-primary" id="exportCarouselJpg" type="button">Download semua slide JPG (ZIP)</button>
+      <button class="btn btn-ghost" id="exportCarouselMp4" type="button">Buat video MP4</button>
+      <div id="carouselExportStatus" class="tool-help" role="status" aria-live="polite">Tambahkan foto untuk mengaktifkan ekspor.</div>
+      <progress id="carouselProgress" max="100" value="0" hidden></progress>
+    </section>
+  </aside>
+  <section class="carousel-workspace">
+    <div class="workspace-head"><div><b>Preview Carousel</b><small id="carouselSlideLabel">Slide 0 / 0</small></div><div class="history-actions"><button class="btn btn-ghost" id="carouselPrev" type="button">← Sebelumnya</button><button class="btn btn-ghost" id="carouselNext" type="button">Berikutnya →</button></div></div>
+    <div class="carousel-preview-stage"><canvas id="carouselCanvas" width="720" height="900" aria-label="Preview carousel"></canvas></div>
+    <div class="workspace-footer"><span>Instagram Feed · Portrait 4:5</span><span>JPG per slide · Video MP4 transisi</span></div>
+  </section>
+</section>
+<script src="js/collage.js?v=20261113-carousel-maker-v1"></script>
+<script src="js/carousel-maker.js?v=20261113-carousel-maker-v1"></script>
 </body></html>
