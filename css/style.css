@@ -378,3 +378,9 @@ body{background:#174b35;color:var(--ink)}
 #carouselProgress{width:100%;height:9px;accent-color:#174b38}
 @media(max-width:850px){.carousel-maker{grid-template-columns:290px minmax(0,1fr)}.carousel-controls{padding:16px 12px}.carousel-workspace{padding:16px}}
 @media(max-width:650px){.collage-top-actions{display:flex;flex-wrap:wrap;gap:6px}.collage-top-actions .quick-link,.collage-top-actions .btn{flex:1}.carousel-maker{display:flex;flex-direction:column}.carousel-controls{max-height:none;border-right:0;border-bottom:1px solid #dce7df}.carousel-workspace{padding:12px;min-height:550px}.carousel-preview-stage{min-height:440px;padding:10px}#carouselCanvas{max-height:560px;max-width:100%}.carousel-workspace .workspace-head{flex-wrap:wrap}}
+
+/* V1.1 — mode switch always visible inside mobile editor panel */
+.collage-mode-panel{display:grid;grid-template-columns:1fr 1.35fr;gap:6px;padding:5px;margin:0 0 16px;border:1px solid #dce7df;border-radius:11px;background:#f3f7f4}
+.collage-mode-tab{min-height:42px;padding:9px 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:#315744;font:700 12px "DM Sans",sans-serif;cursor:pointer}
+.collage-mode-tab.active{background:#174b38;color:#fff;box-shadow:0 2px 8px #174b3826}
+.collage-mode-tab:focus-visible{outline:3px solid #d8c96c;outline-offset:2px}
