@@ -58,7 +58,7 @@ function render() {
         <option ${((g.editingStatus||"Belum mulai")==="Belum mulai")?"selected":""}>Belum mulai</option>
         <option ${g.editingStatus==="Sedang editing" || g.editingStatus==="Revisi"?"selected":""}>Sedang editing</option>
         <option value="Selesai" ${g.editingStatus==="Selesai"?"selected":""}>Selesai (Paket File Saja)</option>
-        <option value="Selesai proses Cetak dan Album" ${g.editingStatus==="Selesai proses Cetak dan Album"?"selected":""}>Selesai proses Cetak dan Album</option>
+        <option value="Selesai proses Cetak dan Album" ${g.editingStatus==="Selesai proses Cetak dan Album"?"selected":""}>Selesai proses Cetak</option>
       </select></td>
       <td class="actions-cell"><div class="actions-wrap"><a class="text-link" href="${escapeHtml(clientGalleryUrl(g.id))}" target="_blank" rel="noopener">Preview</a><button class="mini-action" data-copylink="${escapeHtml(g.id)}">Salin Link</button><button class="mini-action" data-edit="${escapeHtml(g.id)}">Edit</button><button class="mini-action danger" data-delete="${escapeHtml(g.id)}">Hapus</button><button class="mini-action" data-export="${escapeHtml(g.id)}">Rekap</button><button class="mini-action local-download" data-local-download="${escapeHtml(g.id)}">Download JPG/RAW</button><button class="mini-action local-copy" data-local-copy="${escapeHtml(g.id)}">Salin ORI → EDIT</button></div></td>
     </tr>`;

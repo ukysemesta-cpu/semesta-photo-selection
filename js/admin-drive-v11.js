@@ -128,7 +128,7 @@ function render() {
           <option value="Belum mulai" ${g.editingStatus==="Belum mulai"?"selected":""}>Belum mulai</option>
           <option value="Sedang editing" ${g.editingStatus==="Sedang editing"?"selected":""}>Sedang editing</option>
           <option value="Selesai" ${g.editingStatus==="Selesai"?"selected":""}>Selesai (Paket File Saja)</option>
-          <option value="Selesai proses Cetak dan Album" ${g.editingStatus==="Selesai proses Cetak dan Album"?"selected":""}>Selesai proses Cetak dan Album</option>
+          <option value="Selesai proses Cetak dan Album" ${g.editingStatus==="Selesai proses Cetak dan Album"?"selected":""}>Selesai proses Cetak</option>
         </select>
       </td>
       <td class="actions-cell"><div class="actions-wrap">
