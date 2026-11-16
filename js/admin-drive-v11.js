@@ -485,20 +485,167 @@ async function downloadChosenFromComputer(g){
     startDriveDownloads(filtered,"pilihan klien");
   }catch(e){alert("Gagal menyiapkan download: "+(e.message||e));}
 }
+
+// LOCAL ORI -> EDIT: copy files from the administrator's hard disk.
+// Directory handles are stored in IndexedDB so Chrome/Edge can reuse them.
+const SEMESTA_LOCAL_DB="semesta-local-folders-v1";
+const SEMESTA_LOCAL_STORE="handles";
+let semestaOriHandle=null;
+let semestaEditHandle=null;
+
+function openSemestaLocalDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(SEMESTA_LOCAL_DB,1);
+    req.onupgradeneeded=()=>req.result.createObjectStore(SEMESTA_LOCAL_STORE);
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function readSemestaFolderHandle(key){
+  const db=await openSemestaLocalDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(SEMESTA_LOCAL_STORE,"readonly");
+    const req=tx.objectStore(SEMESTA_LOCAL_STORE).get(key);
+    req.onsuccess=()=>{db.close();resolve(req.result||null);};
+    req.onerror=()=>{db.close();reject(req.error);};
+  });
+}
+async function saveSemestaFolderHandle(key,handle){
+  const db=await openSemestaLocalDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(SEMESTA_LOCAL_STORE,"readwrite");
+    tx.objectStore(SEMESTA_LOCAL_STORE).put(handle,key);
+    tx.oncomplete=()=>{db.close();resolve();};
+    tx.onerror=()=>{db.close();reject(tx.error);};
+  });
+}
+async function localHandlePermission(handle,mode){
+  if(!handle) return false;
+  let p=await handle.queryPermission({mode});
+  if(p!=="granted") p=await handle.requestPermission({mode});
+  return p==="granted";
+}
+const semestaFoldersReady=(async()=>{
+  try{
+    semestaOriHandle=await readSemestaFolderHandle("ori");
+    semestaEditHandle=await readSemestaFolderHandle("edit");
+  }catch(e){console.warn("Folder lokal belum tersimpan:",e);}
+})();
+async function chooseLocalFolders(){
+  if(!window.showDirectoryPicker || !window.indexedDB){
+    throw new Error("Penyalinan lokal membutuhkan Chrome atau Microsoft Edge terbaru melalui HTTPS.");
+  }
+  await semestaFoldersReady;
+
+  // Browsers require a fresh user gesture for each directory picker.
+  // Therefore ORI and EDIT are selected on separate clicks, then reused.
+  if(!semestaOriHandle){
+    alert("Pilih folder ORI pada jendela berikutnya. Setelah tersimpan, klik Salin ORI → EDIT lagi untuk memilih folder EDIT.");
+    semestaOriHandle=await window.showDirectoryPicker({id:"semesta-ori-folder",mode:"read"});
+    await saveSemestaFolderHandle("ori",semestaOriHandle);
+    return null;
+  }
+  if(!semestaEditHandle){
+    alert("Pilih folder EDIT pada jendela berikutnya. Setelah tersimpan, klik Salin ORI → EDIT sekali lagi untuk mulai menyalin.");
+    semestaEditHandle=await window.showDirectoryPicker({id:"semesta-edit-folder",mode:"readwrite"});
+    await saveSemestaFolderHandle("edit",semestaEditHandle);
+    return null;
+  }
+
+  if(!(await localHandlePermission(semestaOriHandle,"read"))){
+    semestaOriHandle=null;
+    await saveSemestaFolderHandle("ori",null);
+    alert("Izin akses folder ORI tidak tersedia. Klik tombol Salin ORI → EDIT untuk memilih ulang folder ORI.");
+    return null;
+  }
+  if(!(await localHandlePermission(semestaEditHandle,"readwrite"))){
+    semestaEditHandle=null;
+    await saveSemestaFolderHandle("edit",null);
+    alert("Izin akses folder EDIT tidak tersedia. Klik tombol Salin ORI → EDIT untuk memilih ulang folder EDIT.");
+    return null;
+  }
+  return {ori:semestaOriHandle,edit:semestaEditHandle};
+}
+function localFilenameBase(name){
+  return String(name||"").replace(/\.[^.]+$/,"").normalize("NFC").toLocaleLowerCase();
+}
+function localFileExtension(name){
+  return String(name||"").match(/\.([^.]+)$/)?.[1].toLowerCase()||"";
+}
+const LOCAL_IMAGE_EXTENSIONS=new Set([
+  "jpg","jpeg","tif","tiff","png","heic","heif","webp",
+  "cr2","cr3","nef","arw","raf","dng","orf","rw2","pef","srw"
+]);
+async function scanLocalOriFiles(dir,relativePath=[],out=[]){
+  for await(const entry of dir.values()){
+    if(entry.kind==="directory"){
+      await scanLocalOriFiles(entry,[...relativePath,entry.name],out);
+    }else if(entry.kind==="file" && LOCAL_IMAGE_EXTENSIONS.has(localFileExtension(entry.name))){
+      out.push({handle:entry,path:[...relativePath,entry.name],name:entry.name});
+    }
+  }
+  return out;
+}
+async function getOrCreateLocalTargetDirectory(root,parts){
+  let dir=root;
+  for(const part of parts) dir=await dir.getDirectoryHandle(part,{create:true});
+  return dir;
+}
 async function copyChosenOriToEdit(g){
   try{
+    // Open local folder pickers before awaiting Supabase so the browser's
+    // user-activation requirement for showDirectoryPicker is preserved.
+    const folders=await chooseLocalFolders();
+    if(!folders)return;
+    const {ori,edit}=folders;
     const chosen=await getSelectedPhotoRecords(g);
     if(!chosen.length){alert("Belum ada pilihan foto yang tersimpan.");return;}
-    // This action now downloads the selected original Drive files to Downloads.
-    // Admin can move them manually into the local EDIT folder, regardless of Drive folder layout.
-    const available=chosen.filter(photo=>photo.drive_file_id||photo.download_url);
-    if(!available.length){
-      alert("Foto pilihan belum memiliki ID file Google Drive. Jalankan Sinkronisasi Google Drive terlebih dahulu.");
+    const wanted=new Set(chosen.map(p=>localFilenameBase(p.filename)).filter(Boolean));
+    if(!wanted.size){alert("Data pilihan klien tidak memiliki nama file foto yang dapat dicocokkan.");return;}
+
+    const allFiles=await scanLocalOriFiles(ori);
+    const matches=allFiles.filter(f=>wanted.has(localFilenameBase(f.name)));
+    if(!matches.length){
+      const examples=[...wanted].slice(0,5).join(", ");
+      alert("Tidak ditemukan file ORI yang cocok di folder lokal yang dipilih.\n\nNama dasar yang dicari antara lain:\n"+examples+"\n\nPastikan nama file di folder ORI sama dengan nama file foto pilihan klien. Sistem sudah mencari sampai ke seluruh subfolder.");
       return;
     }
-    startDriveDownloads(available,"ORI pilihan klien");
-  }catch(e){alert("Gagal menyiapkan file ORI: "+(e.message||e));}
+
+    let copied=0,skipped=0,failed=[];
+    for(const item of matches){
+      try{
+        const relativeDirs=item.path.slice(0,-1);
+        const targetDir=await getOrCreateLocalTargetDirectory(edit,relativeDirs);
+        const targetName=item.path[item.path.length-1];
+        // Never silently overwrite an existing file in EDIT.
+        try{
+          await targetDir.getFileHandle(targetName,{create:false});
+          skipped++;
+          continue;
+        }catch(err){
+          if(err.name!=="NotFoundError") throw err;
+        }
+        const sourceFile=await item.handle.getFile();
+        const target=await targetDir.getFileHandle(targetName,{create:true});
+        const writable=await target.createWritable();
+        await writable.write(sourceFile);
+        await writable.close();
+        copied++;
+      }catch(err){
+        failed.push(item.name+": "+(err.message||"gagal disalin"));
+      }
+    }
+    const missing=[...wanted].filter(base=>!matches.some(f=>localFilenameBase(f.name)===base));
+    let report=`Penyalinan lokal selesai.\n\nBerhasil disalin: ${copied} file\nSudah ada di EDIT (dilewati): ${skipped} file\nTidak ditemukan: ${missing.length} nama file`;
+    if(missing.length) report+="\n\nTidak ditemukan:\n"+missing.slice(0,12).join("\n");
+    if(failed.length) report+="\n\nGagal disalin:\n"+failed.slice(0,8).join("\n");
+    alert(report);
+  }catch(e){
+    if(e.name==="AbortError") return;
+    alert("Gagal menyalin file ORI ke EDIT: "+(e.message||e));
+  }
 }
+
 
 $("galleryTable").addEventListener("click",async event=>{
   const t=event.target;
