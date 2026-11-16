@@ -611,32 +611,35 @@ async function copyChosenOriToEdit(g){
       return;
     }
 
-    let copied=0,skipped=0,failed=[];
+    let copied=0,overwritten=0,failed=[];
     for(const item of matches){
       try{
         const relativeDirs=item.path.slice(0,-1);
         const targetDir=await getOrCreateLocalTargetDirectory(edit,relativeDirs);
         const targetName=item.path[item.path.length-1];
-        // Never silently overwrite an existing file in EDIT.
+        let existed=false;
         try{
           await targetDir.getFileHandle(targetName,{create:false});
-          skipped++;
-          continue;
+          existed=true;
         }catch(err){
           if(err.name!=="NotFoundError") throw err;
         }
+
+        // create:true returns the existing file handle when the name already exists.
+        // Writing the source File replaces its contents; ORI remains untouched.
         const sourceFile=await item.handle.getFile();
         const target=await targetDir.getFileHandle(targetName,{create:true});
         const writable=await target.createWritable();
         await writable.write(sourceFile);
         await writable.close();
-        copied++;
+        if(existed) overwritten++;
+        else copied++;
       }catch(err){
         failed.push(item.name+": "+(err.message||"gagal disalin"));
       }
     }
     const missing=[...wanted].filter(base=>!matches.some(f=>localFilenameBase(f.name)===base));
-    let report=`Penyalinan lokal selesai.\n\nBerhasil disalin: ${copied} file\nSudah ada di EDIT (dilewati): ${skipped} file\nTidak ditemukan: ${missing.length} nama file`;
+    let report=`Penyalinan lokal selesai.\n\nFile baru disalin: ${copied} file\nFile lama ditimpa dari ORI: ${overwritten} file\nTidak ditemukan: ${missing.length} nama file`;
     if(missing.length) report+="\n\nTidak ditemukan:\n"+missing.slice(0,12).join("\n");
     if(failed.length) report+="\n\nGagal disalin:\n"+failed.slice(0,8).join("\n");
     alert(report);
