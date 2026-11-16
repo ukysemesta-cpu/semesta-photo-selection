@@ -603,11 +603,14 @@ async function copyChosenOriToEdit(g){
     const wanted=new Set(chosen.map(p=>localFilenameBase(p.filename)).filter(Boolean));
     if(!wanted.size){alert("Data pilihan klien tidak memiliki nama file foto yang dapat dicocokkan.");return;}
 
+    // Klien memilih JPG dari Drive sebagai preview, tetapi untuk proses editing
+    // ambil hanya file RAW Canon .CR3 dari folder ORI (termasuk subfolder RAW).
     const allFiles=await scanLocalOriFiles(ori);
-    const matches=allFiles.filter(f=>wanted.has(localFilenameBase(f.name)));
+    const rawFiles=allFiles.filter(f=>localFileExtension(f.name)==="cr3");
+    const matches=rawFiles.filter(f=>wanted.has(localFilenameBase(f.name)));
     if(!matches.length){
       const examples=[...wanted].slice(0,5).join(", ");
-      alert("Tidak ditemukan file ORI yang cocok di folder lokal yang dipilih.\n\nNama dasar yang dicari antara lain:\n"+examples+"\n\nPastikan nama file di folder ORI sama dengan nama file foto pilihan klien. Sistem sudah mencari sampai ke seluruh subfolder.");
+      alert("File RAW Canon (.CR3) yang cocok tidak ditemukan di folder ORI.\\n\\nSistem hanya mencari file .CR3, termasuk di dalam subfolder RAW.\\n\\nNama dasar yang dicari antara lain:\\n"+examples+"\\n\\nPastikan nama file CR3 sama dengan nama JPG yang dipilih klien.");
       return;
     }
 
@@ -639,7 +642,7 @@ async function copyChosenOriToEdit(g){
       }
     }
     const missing=[...wanted].filter(base=>!matches.some(f=>localFilenameBase(f.name)===base));
-    let report=`Penyalinan lokal selesai.\n\nFile baru disalin: ${copied} file\nFile lama ditimpa dari ORI: ${overwritten} file\nTidak ditemukan: ${missing.length} nama file`;
+    let report=`Penyalinan lokal selesai.\n\nFile baru disalin: ${copied} file\nFile lama ditimpa dari ORI: ${overwritten} file\nRAW .CR3 tidak ditemukan: ${missing.length} nama file`;
     if(missing.length) report+="\n\nTidak ditemukan:\n"+missing.slice(0,12).join("\n");
     if(failed.length) report+="\n\nGagal disalin:\n"+failed.slice(0,8).join("\n");
     alert(report);
