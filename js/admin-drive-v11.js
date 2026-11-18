@@ -108,6 +108,12 @@ function render() {
       (galleryStatusFilter==="revision" && g.revisionAllowed));
   $("galleryViewLabel").textContent = showArchivedGalleries ? `Arsip · ${rows.length} galeri` : `Galeri aktif · ${rows.length} galeri`;
   $("toggleArchived").textContent = showArchivedGalleries ? "Kembali ke Galeri Aktif" : "Lihat Arsip";
+  const purgeAllButton = $("purgeAllArchived");
+  if (purgeAllButton) {
+    const archivedCount = galleries.filter(g => g.isArchived).length;
+    purgeAllButton.hidden = !showArchivedGalleries || archivedCount === 0;
+    purgeAllButton.textContent = `Hapus Semua Arsip (${archivedCount})`;
+  }
   const body=$("galleryTable");
   if(!rows.length){body.innerHTML='<tr><td colspan="6" class="empty-cell">'+(showArchivedGalleries?'Belum ada galeri yang diarsipkan.':'Tidak ada galeri yang cocok.')+'</td></tr>';return;}
   body.innerHTML=rows.map(g=>{
@@ -650,6 +656,56 @@ async function copyChosenOriToEdit(g){
 }
 
 
+// Hapus seluruh galeri arsip melalui Edge Function yang sama dengan hapus satu galeri.
+const purgeAllArchivedButton = $("purgeAllArchived");
+if (purgeAllArchivedButton) {
+  purgeAllArchivedButton.addEventListener("click", async () => {
+    const archived = galleries.filter(g => g.isArchived);
+    if (!archived.length) {
+      alert("Tidak ada galeri yang diarsipkan.");
+      return;
+    }
+    if (!confirm(
+      `Hapus PERMANEN semua ${archived.length} galeri yang diarsipkan?\\n\\n` +
+      `Data galeri, draft, pilihan, riwayat terkait, dan preview di Supabase Storage akan dibersihkan.\\n` +
+      `Foto asli di Google Drive TIDAK akan dihapus.\\n\\n` +
+      `Tindakan ini tidak dapat dibatalkan.`
+    )) return;
+
+    purgeAllArchivedButton.disabled = true;
+    const originalLabel = purgeAllArchivedButton.textContent;
+    const succeeded = [];
+    const failed = [];
+    try {
+      for (let i = 0; i < archived.length; i++) {
+        const gallery = archived[i];
+        purgeAllArchivedButton.textContent = `Menghapus ${i + 1}/${archived.length}...`;
+        try {
+          const { data, error } = await sb.functions.invoke("permanently-delete-gallery", {
+            body: { gallery_id: gallery.id }
+          });
+          if (error) throw error;
+          if (!data?.ok) throw new Error(data?.message || "Penghapusan tidak berhasil.");
+          succeeded.push(gallery);
+        } catch (error) {
+          failed.push({ gallery, message: error?.message || "Kesalahan tidak diketahui" });
+        }
+      }
+      await loadGalleries();
+      let report = `Penghapusan arsip selesai.\\n\\nBerhasil: ${succeeded.length} galeri`;
+      if (failed.length) {
+        report += `\\nGagal: ${failed.length} galeri\\n\\nGaleri yang gagal:`;
+        report += failed.map(item => `\\n• ${item.gallery.clientName} — ${item.gallery.galleryName}: ${item.message}`).join("");
+      }
+      report += "\\n\\nFoto asli Google Drive tetap aman.";
+      alert(report);
+    } finally {
+      purgeAllArchivedButton.disabled = false;
+      purgeAllArchivedButton.textContent = originalLabel;
+    }
+  });
+}
+
 $("galleryTable").addEventListener("click",async event=>{
   const t=event.target;
   if(t.closest("[data-copy]")){const g=galleries.find(x=>x.id===t.closest("[data-copy]").dataset.copy);if(g)copyGalleryInvite(g);return;}
@@ -676,9 +732,7 @@ $("galleryTable").addEventListener("click",async event=>{
     if(!g.isArchived){
       alert("Arsipkan galeri terlebih dahulu sebelum menghapus permanen.");return;
     }
-    const phrase = `HAPUS ${g.clientName}`;
-    const typed = prompt(`PERINGATAN: Penghapusan permanen tidak dapat dibatalkan.\n\nPreview di Supabase Storage juga akan dibersihkan. Foto asli Google Drive tetap aman.\n\nGaleri: ${g.galleryName}\nKlien: ${g.clientName}\n\nFoto asli di Google Drive tidak dihapus. Data galeri, draft, pilihan, dan riwayat terkait akan dihapus dari database.\n\nKetik persis: ${phrase}`);
-    if(typed !== phrase){ if(typed !== null) alert("Konfirmasi tidak cocok. Galeri tidak dihapus."); return; }
+    if(!confirm(`Hapus permanen galeri "${g.galleryName}" milik ${g.clientName}?\\n\\nData galeri, draft, pilihan, riwayat terkait, dan preview di Supabase Storage akan dibersihkan.\\nFoto asli Google Drive tetap aman.\\n\\nTindakan ini tidak dapat dibatalkan.`))return;
     const button=t.closest("[data-purge]");button.disabled=true;
     try{
       const {data,error}=await sb.functions.invoke("permanently-delete-gallery",{body:{gallery_id:g.id}});
