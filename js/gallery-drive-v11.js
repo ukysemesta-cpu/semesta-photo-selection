@@ -58,7 +58,10 @@ async function loadSelectionDraft(showMessage=false){
   photos.forEach(p=>p.selected=idSet.has(p.id));
   lastDraftIds=currentDraftIds().join(",");
   draftDirty=false;
-  render();
+  // Initial gallery render is handled once by init() after the draft is loaded.
+  // Avoid rebuilding all photo cards (and restarting 189 image requests) here.
+  if($("photoGrid").children.length) syncSelectionCards();
+  updateSelectionSummary();
   if(showMessage)setDraftStatus("Pilihan sementara berhasil disinkronkan.");
  }catch(err){
   console.error("Load selection draft failed:",err);
@@ -107,26 +110,15 @@ async function refreshDraftFromServer(){
    const idSet=new Set(ids);
    photos.forEach(p=>p.selected=idSet.has(p.id));
    lastDraftIds=snapshot;
-   render();
+   if(showingSelected || sortMode==="selected")render();
+   else{syncSelectionCards();updateSelectionSummary();}
    if($("reviewModal")?.classList.contains("open"))renderReviewList();
    setDraftStatus("Pilihan diperbarui dari perangkat lain.");
   }
  }catch(err){console.warn("Draft refresh failed:",err);}
 }
 function selectedCount(){return photos.filter(p=>p.selected).length;}
-function render(){
- let visible=photos.filter(p=>(!showingSelected||p.selected)&&(!showingHighlight||p.is_highlight));
- if(searchTerm){const term=searchTerm.toLocaleLowerCase("id");visible=visible.filter(p=>String(p.filename||"").toLocaleLowerCase("id").includes(term));}
- if(sortMode==="az")visible.sort((a,b)=>String(a.filename).localeCompare(String(b.filename),"id",{numeric:true,sensitivity:"base"}));
- else if(sortMode==="za")visible.sort((a,b)=>String(b.filename).localeCompare(String(a.filename),"id",{numeric:true,sensitivity:"base"}));
- else if(sortMode==="selected")visible.sort((a,b)=>Number(!!b.selected)-Number(!!a.selected)||(Number(a.sort_order)||0)-(Number(b.sort_order)||0));
- $("photoCount").textContent=`${visible.length} dari ${photos.length} foto ditampilkan`;
- $("highlightFilter").hidden=!photos.some(p=>p.is_highlight);
- $("photoGrid").innerHTML=visible.map(p=>`<article class="photo-card image-loading ${p.selected?"selected":""}" data-id="${p.id}">
-   <img class="photo-thumb" src="${escapeHtml(p.preview_url||(p.drive_file_id?`https://drive.google.com/uc?export=view&id=${encodeURIComponent(p.drive_file_id)}`:""))}" data-drive-id="${escapeHtml(p.drive_file_id||"")}" data-fallback="${p.preview_url?"0":"1"}" data-image-state="loading" alt="${escapeHtml(p.filename)}" loading="lazy" decoding="async" fetchpriority="low">
-   <span class="photo-name">${escapeHtml(p.filename)}</span>
-   <button class="heart-btn ${p.selected?"selected":""}" data-select="${p.id}" aria-label="Pilih foto">${p.selected?"♥":"♡"}</button>
- </article>`).join("")||'<p class="muted">Belum ada foto dalam galeri ini. Silakan hubungi admin.</p>';
+function updateSelectionSummary(){
  const count=selectedCount(),limit=Number(gallery.selection_limit);
  $("selectedCount").textContent=count;
  $("reviewCount").textContent=count;
@@ -145,6 +137,33 @@ function render(){
    if(locked)$("draftSyncStatus").textContent="Pilihan final terkunci. Hubungi admin jika ingin revisi.";
    else if(gallery.selection_status==="submitted"&&gallery.revision_allowed)$("draftSyncStatus").textContent="Akses revisi dibuka oleh admin. Setelah dikirim, galeri akan terkunci kembali.";
  }
+}
+function syncSelectionCards(){
+ photos.forEach(p=>{
+  const card=$("photoGrid").querySelector(`[data-id="${CSS.escape(String(p.id))}"]`);
+  if(!card)return;
+  card.classList.toggle("selected",!!p.selected);
+  const button=card.querySelector("[data-select]");
+  if(button){button.classList.toggle("selected",!!p.selected);button.textContent=p.selected?"♥":"♡";}
+ });
+}
+function render(){
+ let visible=photos.filter(p=>(!showingSelected||p.selected)&&(!showingHighlight||p.is_highlight));
+ if(searchTerm){const term=searchTerm.toLocaleLowerCase("id");visible=visible.filter(p=>String(p.filename||"").toLocaleLowerCase("id").includes(term));}
+ if(sortMode==="az")visible.sort((a,b)=>String(a.filename).localeCompare(String(b.filename),"id",{numeric:true,sensitivity:"base"}));
+ else if(sortMode==="za")visible.sort((a,b)=>String(b.filename).localeCompare(String(a.filename),"id",{numeric:true,sensitivity:"base"}));
+ else if(sortMode==="selected")visible.sort((a,b)=>Number(!!b.selected)-Number(!!a.selected)||(Number(a.sort_order)||0)-(Number(b.sort_order)||0));
+ $("photoCount").textContent=`${visible.length} dari ${photos.length} foto ditampilkan`;
+ $("highlightFilter").hidden=!photos.some(p=>p.is_highlight);
+ $("photoGrid").innerHTML=visible.map((p,index)=>{
+  const priority=index<8;
+  return `<article class="photo-card image-loading ${p.selected?"selected":""}" data-id="${escapeHtml(p.id)}">
+   <img class="photo-thumb" src="${escapeHtml(p.preview_url||(p.drive_file_id?`https://drive.google.com/uc?export=view&id=${encodeURIComponent(p.drive_file_id)}`:""))}" data-drive-id="${escapeHtml(p.drive_file_id||"")}" data-fallback="${p.preview_url?"0":"1"}" data-image-state="loading" alt="${escapeHtml(p.filename)}" loading="${priority?"eager":"lazy"}" decoding="async"${priority?' fetchpriority="high"':''}>
+   <span class="photo-name">${escapeHtml(p.filename)}</span>
+   <button class="heart-btn ${p.selected?"selected":""}" data-select="${escapeHtml(p.id)}" aria-label="Pilih foto">${p.selected?"♥":"♡"}</button>
+ </article>`;
+ }).join("")||'<p class="muted">Belum ada foto dalam galeri ini. Silakan hubungi admin.</p>';
+ updateSelectionSummary();
 }
 function openReview(){
  renderReviewList();
@@ -217,7 +236,18 @@ async function togglePhoto(id){
  if(gallery.selection_deadline && new Date().toISOString().slice(0,10)>gallery.selection_deadline){alert("Batas waktu pemilihan telah berakhir.");return;}
  const p=photos.find(x=>x.id===id);if(!p)return;
  if(!p.selected&&Number(gallery.selection_limit)>0&&selectedCount()>=Number(gallery.selection_limit)){alert(`Maksimal pilihan ${gallery.selection_limit} foto.`);return;}
- p.selected=!p.selected;render();
+ p.selected=!p.selected;
+ if(showingSelected || sortMode==="selected"){
+  render();
+ }else{
+  const card=$("photoGrid").querySelector(`[data-id="${CSS.escape(String(p.id))}"]`);
+  if(card){
+   card.classList.toggle("selected",p.selected);
+   const button=card.querySelector("[data-select]");
+   if(button){button.classList.toggle("selected",p.selected);button.textContent=p.selected?"♥":"♡";}
+  }
+  updateSelectionSummary();
+ }
  if($("reviewModal").classList.contains("open"))renderReviewList();
  queueDraftSave();
 }
